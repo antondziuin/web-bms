@@ -138,7 +138,6 @@
       </div>
       <div class="switches">
         <label class="sw"><input id="showRaw" type="checkbox">Raw</label>
-        <label class="sw" title="Отправлять данные на сервер логирования"><input id="cloudLog" type="checkbox">Cloud log</label>
         <label class="sw" id="wakeLockSw" title="Не давать экрану гаснуть, пока страница открыта" hidden><input id="wakeLock" type="checkbox">Экран вкл.</label>
       </div>
       <div class="meta-line">
@@ -187,14 +186,13 @@
 
 /* ================= Config ================= */
 const MAX_CELLS = 32;
-const API_BASE = 'https://bms.area.pp.ua';
 const RECONNECT_MAX_ATTEMPTS = 8;
 const CONNECT_TIMEOUT_MS = 20000;
 const STALE_AFTER_MS = 10000;
 const MAX_POINTS = 1000;
 const DEFAULT_MIN_MV = 2900;
 const DEFAULT_MAX_MV = 4200;
-const STORAGE_KEYS = { lastDeviceId:'bt:lastDeviceId', cloudLog:'log:enabled', wakeLock:'ui:wakeLock', tab:'ui:tab' };
+const STORAGE_KEYS = { lastDeviceId:'bt:lastDeviceId', wakeLock:'ui:wakeLock', tab:'ui:tab' };
 
 const UUID = {
   JK_SVC:'0000ffe0-0000-1000-8000-00805f9b34fb',
@@ -329,7 +327,6 @@ const hudTemps = $('#tempsPill');
 const hudCycles = $('#cyclesPill');
 const hudErrors = $('#errorsPill');
 const showRaw = $('#showRaw');
-const cloudLogChk = $('#cloudLog');
 const wakeLockChk = $('#wakeLock');
 const cellsEmpty = $('#cellsEmpty');
 
@@ -602,7 +599,6 @@ function compileBatInfo(){
   } else lines.push('Cells: –');
   const now=Date.now();
   lines.push(`Freshness: cells ${ago(STATE.lastCellsTs, now)}, pack ${ago(STATE.lastSummaryTs, now)}`);
-  lines.push(`Cloud log: ${logger.describe()}`);
   return lines.join('\n');
 }
 
@@ -613,11 +609,6 @@ function applyRawVisibility(){
 }
 showRaw.addEventListener('change', applyRawVisibility);
 
-cloudLogChk.checked = storageGet(STORAGE_KEYS.cloudLog, '1') === '1';
-cloudLogChk.addEventListener('change', ()=>{
-  storageSet(STORAGE_KEYS.cloudLog, cloudLogChk.checked ? '1' : '0');
-  if (cloudLogChk.checked && conn.connected) logger.start(); else logger.stop();
-});
 
 /* Screen Wake Lock: BLE-соединение на телефоне часто рвётся, когда экран гаснет */
 let wakeLock = null;
@@ -961,7 +952,6 @@ function onGattDisconnected(ev){
   const d = conn.driver;
   conn.driver = null; conn.connected = false;
   if (d) d.stop().catch(()=>{});
-  logger.stop();
   setBtState('idle');
   if (!wasConnected) return;
   if (conn.userDisconnect){ setStatus('Disconnected'); return; }
@@ -989,7 +979,6 @@ function scheduleReconnect(){
 async function teardown(){
   const d = conn.driver;
   conn.driver = null; conn.connected = false;
-  logger.stop();
   if (d){ try{ await d.stop(); }catch{} }
   try{ if (conn.device?.gatt?.connected) conn.device.gatt.disconnect(); }catch{}
 }
@@ -1022,7 +1011,6 @@ async function connect(device, opts={}){
     storageSet(STORAGE_KEYS.lastDeviceId, device.id || '');
     setStatus(`Connected · ${name} (${driver.kind})`);
     setBtState('connected');
-    if (cloudLogChk.checked) logger.start();
     return true;
   }catch(err){
     console.error(err);
@@ -1139,89 +1127,6 @@ async function autoConnectOnLoad(){
   }
   openPicker('Нажмите «Выбрать устройство…» (браузеру нужен пользовательский жест).');
 }
-
-/* ================= Cloud logger ================= */
-const logger = (()=>{
-  let timer = null, inFlight = false, lastSentAt = 0, lastHash = '';
-  let failCount = 0, nextTryAt = 0, sentCount = 0, lastError = '';
-
-  function collectSample(){
-    if (!isNum(STATE.totalV) && !activeCells().length) return null; // ещё нет данных
-    const cells = activeCells().slice(0, MAX_CELLS);
-    const sum = cells.reduce((a, b) => a + b, 0);
-    const diffMv = (isNum(STATE.totalV) && cells.length) ? Math.round((STATE.totalV - sum) * 1000) : null;
-    const [minMv, maxMv] = getCellScaleMv();
-    const v = isNum(STATE.totalV) ? STATE.totalV : null;
-    const i = isNum(STATE.current) ? STATE.current : null;
-    const power = (v != null && i != null) ? v * i : null;
-    return {
-      deviceName: (conn.device?.name || 'Battery').toString(),
-      timestamp: new Date().toISOString(),
-      totalV: v, current: i, soc: isNum(STATE.soc) ? STATE.soc : null,
-      capRem: isNum(STATE.capRem) ? STATE.capRem : null,
-      temp1: isNum(STATE.temp1) ? STATE.temp1 : null,
-      temp2: isNum(STATE.temp2) ? STATE.temp2 : null,
-      tmos: isNum(STATE.tmos) ? STATE.tmos : null,
-      balancing: !!STATE.balancing,
-      errors: (STATE.errors || '').trim() || null,
-      powerW: isNum(power) ? power : null,
-      scaleMinMv: isNum(minMv) ? minMv : null,
-      scaleMaxMv: isNum(maxMv) ? maxMv : null,
-      packSumDiffMv: isNum(diffMv) ? diffMv : null,
-      cells: cells.length ? cells : null,
-      pageUrl: location.href,
-      source: 'web-bt'
-    };
-  }
-  function post(sample){
-    return fetch(`${API_BASE}/api/batteries/samples`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(sample),
-      keepalive: true,
-      mode: 'cors'
-    }).then(res=>{ if (!res.ok) throw new Error(`HTTP ${res.status}`); });
-  }
-  async function trySend(){
-    if (inFlight || Date.now() < nextTryAt) return;
-    const s = collectSample();
-    if (!s) return;
-    const fingerprint = JSON.stringify([s.totalV, s.current, s.soc, s.powerW, s.cells]);
-    const stale = (Date.now() - lastSentAt) > 10_000;
-    if (!stale && fingerprint === lastHash) return;
-    inFlight = true;
-    try{
-      await post(s);
-      lastHash = fingerprint; lastSentAt = Date.now();
-      failCount = 0; nextTryAt = 0; sentCount++; lastError = '';
-    }catch(e){
-      failCount++;
-      lastError = errMsg(e);
-      nextTryAt = Date.now() + Math.min(60_000, 1000 * 2 ** failCount); // backoff, чтобы не спамить упавший сервер
-      if (failCount <= 3) console.warn('log send failed', e);
-    }finally{ inFlight = false; }
-  }
-  function flush(){
-    if (document.visibilityState !== 'hidden' || inFlight) return;
-    const s = collectSample();
-    if (s) post(s).catch(()=>{});
-  }
-  return {
-    start(){
-      if (timer) return;
-      timer = setInterval(trySend, 1000);
-      document.addEventListener('visibilitychange', flush);
-    },
-    stop(){
-      if (timer){ clearInterval(timer); timer = null; }
-      document.removeEventListener('visibilitychange', flush);
-    },
-    describe(){
-      if (!timer) return cloudLogChk.checked ? 'idle' : 'off';
-      return lastError ? `error (${lastError}), sent ${sentCount}` : `on, sent ${sentCount}`;
-    },
-  };
-})();
 
 /* ================= Init ================= */
 setStatus('Idle');
