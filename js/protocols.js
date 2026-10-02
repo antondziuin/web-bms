@@ -70,6 +70,7 @@ export function parseJkFrame(d){
   if (type===0x01) return parseJkSettings(d);
   if (type===0x02) return parseJk02(d,0) || parseJk02(d,32) || parseJk04(d);
   if (type===0x03) return parseJkDeviceInfo(d);
+  if (type===0x05) return parseJkLogbook(d);
   return null;
 }
 
@@ -77,7 +78,9 @@ export function parseJkDeviceInfo(d){
   const ascii = (a,b)=> String.fromCharCode(...d.slice(a,b)).replace(/[^\x20-\x7e]/g,'').trim();
   const model = ascii(6,22), hw = ascii(22,30), sw = ascii(30,38);
   const s = [model, hw && `HW ${hw}`, sw && `SW ${sw}`].filter(Boolean).join(' · ');
-  return s ? { model: s } : null;
+  // why: время записей журнала BMS отсчитывается в секундах работы — по uptime пересчитываем его в дату
+  const uptime = d.length > 46 ? jk.u32(d, 38) : NaN, powerOnCount = d.length > 46 ? jk.u32(d, 42) : NaN;
+  return s ? { model: s, uptime, powerOnCount } : null;
 }
 
 export function parseJkSettings(d){
@@ -181,8 +184,9 @@ const jbd = {
 
 export function parseJbdFrame(frame){
   const fn = frame[1], status = frame[2], len = frame[3];
-  if (status !== 0x00) return null;
   const data = frame.slice(4, 4 + len);
+  if (fn === 0xAA) return status === 0x00 ? { jbdCounters: parseJbdCounters(data) } : { jbdCountersError: status };
+  if (status !== 0x00) return null;
   if (fn === 0x03) return parseJbdHwInfo(data);
   if (fn === 0x04) return parseJbdCells(data);
   if (fn === 0x05) return parseJbdVersion(data);
@@ -225,3 +229,117 @@ export function jbdErrors(mask){
   return out.join('; ');
 }
 
+/* ---------- JK logbook (event log kept in the BMS memory) ----------
+   Command 0xA1 → frame type 0x05: u32 entry count at 6, then entries of 5 bytes from offset 11:
+   u32 time (seconds of BMS run time) + u8 event code; at most 50 entries per frame.
+   Layout and event names follow syssi/esphome-jk-bms (Apache-2.0), components/jk_bms_ble. */
+export const JK_LOGBOOK_MAX = 50;
+const JK_LOG_EVENTS = {
+  0x01: "Boot",
+  0x02: "Shutdown",
+  0x03: "APP close charge",
+  0x04: "APP open charge",
+  0x05: "APP close discharge",
+  0x06: "APP open discharge",
+  0x07: "Remote close charge",
+  0x08: "Remote open charge",
+  0x09: "Remote close discharge",
+  0x0A: "Remote open discharge",
+  0x0B: "MOS over temperature protection",
+  0x0C: "MOS over-temperature protection is released",
+  0x0D: "Abnormal current sensor",
+  0x0E: "Abnormal release of current sensor",
+  0x0F: "Abnormal coprocessor communication",
+  0x10: "Abnormal cancellation of coprocessor communication",
+  0x11: "Cell overcharge protection",
+  0x12: "Cell overcharge protection is released",
+  0x13: "Battery overcharge protection",
+  0x14: "Battery overcharge protection is released",
+  0x15: "Charge overcurrent protection",
+  0x16: "Charge overcurrent protection is released",
+  0x17: "Charge short circuit protection",
+  0x18: "Charge short circuit protection is released",
+  0x19: "Charge over temperature protection",
+  0x1A: "Charge over temperature protection is released",
+  0x1B: "Charge low temperature protection",
+  0x1C: "Charge low temperature protection is released",
+  0x1D: "Cell undervoltage protection",
+  0x1E: "Cell undervoltage protection is released",
+  0x1F: "Battery undervoltage protection",
+  0x20: "Battery undervoltage protection is released",
+  0x21: "Discharge overcurrent protection",
+  0x22: "Discharge overcurrent protection is released",
+  0x23: "Discharge short circuit protection",
+  0x24: "Discharge short circuit protection released",
+  0x25: "Discharge over temperature protection",
+  0x26: "Discharge over-temperature protection is released",
+  0x27: "Reset Watch-Dog",
+  0x28: "Discharge level 2 short circuit protection",
+  0x29: "Manually enable the emergency mode",
+  0x2A: "Manually turn off the emergency mode",
+  0x2B: "Turn off the emergency mode automatically",
+  0x2C: "APP to turn it off",
+  0x2D: "Button to turn it off",
+  0x2E: "Discharge On Failed",
+  0x2F: "RS485 power off",
+  0x30: "CAN charge off",
+  0x31: "CAN charge on",
+  0x32: "CAN discharge off",
+  0x33: "CAN discharge on",
+  0x34: "RS485 charge off",
+  0x35: "RS485 charge on",
+  0x36: "RS485 discharge off",
+  0x37: "RS485 discharge on",
+  0x38: "Enter sleep",
+  0x39: "Charge MOS abnormal",
+  0x3A: "Discharge MOS abnormal",
+  0x3B: "Time calibration",
+  0x3C: "Cells Count Incorrect",
+  0x3D: "Button Emergency On",
+  0x3E: "Button Emergency Off",
+  0x3F: "Button Forced Heating",
+  0x40: "Discharge OCP II",
+  0x41: "Discharge OCP III",
+  0x42: "SCP Release Failed",
+  0x43: "Factory setting LION",
+  0x44: "Factory setting LFP",
+  0x45: "Factory setting LTO",
+  0x46: "Remote Emergency On",
+  0x47: "Remote Emergency Off",
+  0x48: "Discharge under temperature protection",
+  0x49: "Discharge under temperature protection Release",
+};
+export function jkLogEventName(code){
+  if (JK_LOG_EVENTS[code]) return JK_LOG_EVENTS[code];
+  if (code >= 0x64 && code <= 0x83) return `Cell ${String(code - 0x63).padStart(2, '0')} over charge protection`;
+  if (code >= 0xC8 && code <= 0xE7) return `Cell ${String(code - 0xC7).padStart(2, '0')} over discharge protection`;
+  return `Unknown (0x${code.toString(16).toUpperCase().padStart(2, '0')})`;
+}
+export function parseJkLogbook(d){
+  const count = jk.u32(d, 6);
+  const entries = [];
+  for (let i = 0; i < Math.min(count, JK_LOGBOOK_MAX); i++){
+    const pos = 11 + i * 5;
+    if (pos + 5 > d.length - 1) break;
+    entries.push({ ts: jk.u32(d, pos), code: d[pos + 4] });
+  }
+  return { jkLogbook: { count, entries } };
+}
+
+/* ---------- JBD protection counters (register 0xAA) ----------
+   u16 big-endian counters in this order; reading may require factory mode (write 0x5678 to reg 0x00,
+   leave with 0x0000 to reg 0x01, which exits without saving). */
+export const JBD_PROTECTION_KEYS = ['sc','chgoc','dsgoc','covp','cuvp','chgot','chgut','dsgot','dsgut','povp','puvp'];
+export function jbdBuildWrite(reg, data){
+  const frame = new Uint8Array(7 + data.length);
+  frame[0]=0xDD; frame[1]=0x5A; frame[2]=reg; frame[3]=data.length;
+  frame.set(data, 4);
+  const crc = jbdChecksum(frame, 2, 2 + data.length);
+  frame[4 + data.length]=(crc>>8)&0xFF; frame[5 + data.length]=crc&0xFF; frame[6 + data.length]=0x77;
+  return frame;
+}
+export function parseJbdCounters(d){
+  const counts = [];
+  for (let i = 0; i + 1 < d.length; i += 2) counts.push(jbd.u16(d, i));
+  return counts;
+}

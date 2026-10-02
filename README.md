@@ -30,6 +30,8 @@
 - **Multiple batteries at once** — battery switcher and an “All” view for parallel packs: summed current, power and capacity, capacity-weighted SOC, an overview card per battery; every connected battery reconnects automatically next time
 - **Session counters** — charged / discharged (Ah, Wh), net, peak charge and discharge, pack and cell voltage extremes, SOC at start and now, max temperature and imbalance
 - **Charts** — power, current, voltage and SOC for the last 1000 samples, with a hover / tap tooltip
+- **BMS memory** — reads what the BMS itself stores: the **JK event log** (boots, protections and their release, MOSFET switching — last 50 entries, dated from the BMS run time) and the **JBD protection counters** (short circuit, over/undervoltage, overcurrent, temperature); CSV export
+- **Log in the browser** — records every battery at a chosen interval (5 s – 1 min) and keeps 7 days on the device; view it on the page as a chart and a table, download CSV (Excel) or JSON, open a saved file later; optional raw BLE frame capture for troubleshooting
 - **Works offline** (opt-in) — the app offers to save itself on the device, then opens without a network and can be installed to the home screen
 - **Reliable link** — automatic reconnection when the Bluetooth link drops; optional “keep screen on”
 - **Light and dark themes**, responsive layout from 320 px phones to desktops
@@ -45,10 +47,12 @@
   </tr>
 </table>
 
-<p align="center">
-  <img src="docs/screenshots/desktop-light-en.png" width="880" alt="Desktop, light theme: one battery with its 16 cell voltages"><br>
-  <sub>One battery, light theme</sub>
-</p>
+<table>
+  <tr>
+    <td align="center" width="50%"><img src="docs/screenshots/desktop-light-en.png" alt="Desktop, light theme: one battery with its 16 cell voltages"><br><sub>One battery, light theme</sub></td>
+    <td align="center" width="50%"><img src="docs/screenshots/desktop-log-en.png" alt="Log tab: event log read from a JK BMS and the log recorded in the browser"><br><sub>BMS event log and the browser log</sub></td>
+  </tr>
+</table>
 
 ## Getting started
 
@@ -56,6 +60,7 @@
 2. Press **Connect** → **Choose device…** and pick your BMS in the system dialog. If a PIN is requested, it is usually `123456`.
 3. To watch several packs, press **Add** and pick the next BMS; the **All** chip shows them combined.
 4. To use the app without internet, accept the **Work offline** suggestion (or turn it on later in *Details → Settings*).
+5. **Log** tab: **Read from BMS** shows the log / counters stored in the BMS; below is the log this browser records while a BMS is connected.
 
 Firefox and Safari do not support Web Bluetooth; on iOS the [Bluefy](https://apps.apple.com/app/bluefy-web-ble-browser/id1492822055) browser can be used. Web Bluetooth needs HTTPS or `http://localhost`.
 
@@ -92,9 +97,17 @@ npm run test:e2e   # the app in headless Chromium with a Bluetooth mock (Playwri
 | `js/ble.js` | BLE drivers on top of GATT |
 | `js/model.js`, `js/session.js` | battery state, multi-battery aggregate, session counters |
 | `js/chart.js`, `js/i18n.js`, `js/offline.js` | chart, translations, offline mode |
+| `js/bmsmemory.js` | JK event log / JBD protection counters read from the BMS |
+| `js/log.js`, `js/logformat.js`, `js/logstore.js` | browser log: recording (IndexedDB), viewer, CSV / JSON |
 | `js/app.js` | battery manager and UI |
 | `sw.js` | service worker (registered only after the user opts in) |
 | `tests/` | unit, browser and layout tests, Bluetooth emulator, screenshot script |
+
+### Credits
+
+The JK event-log command (`0xA1`), its frame layout and event names follow
+[syssi/esphome-jk-bms](https://github.com/syssi/esphome-jk-bms) (Apache-2.0). The JBD protection counters
+(register `0xAA`) follow the published JBD BMS communication protocol.
 
 ### Deploying
 

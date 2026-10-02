@@ -59,8 +59,12 @@ for (const locale of LOCALES){
       await page.waitForTimeout(1500); // sessions and charts get a few samples
       for (let chip = 0; chip < 4; chip++){
         await page.click(`#batBar .bat-chip >> nth=${chip}`);
-        for (const tab of ['cells', 'chart', 'session', 'details']){
+        for (const tab of ['cells', 'chart', 'session', 'log', 'details']){
           await page.click(`#tab-${tab}-btn`);
+          if (tab === 'log' && chip > 0 && await page.isVisible('#memRead')){
+            await page.click('#memRead');
+            await page.waitForSelector('#memResult:not([hidden]), #memStatus:not([hidden])', { timeout: 8000 });
+          }
           await page.waitForTimeout(60);
           await auditPage(page, `${at} battery#${chip} ${tab}`, found);
         }

@@ -4,17 +4,30 @@ import { isNum, clamp, hhmmss } from './util.js';
 import { t } from './i18n.js';
 
 export const CHART_GAP_MS = 15000; // разрыв линии, если данных не было дольше
+/* now / tip: decimals for the "Now" label and the tooltip */
 export const METRICS = {
-  w:   { unit:'W', color:'--c-power',   get:p=>p.w },
-  i:   { unit:'A', color:'--c-current', get:p=>p.i },
-  v:   { unit:'V', color:'--c-volt',    get:p=>p.v },
-  soc: { unit:'%', color:'--c-soc',     get:p=>p.soc },
+  w:   { unit:'W',  color:'--c-power',   get:p=>p.w,   now:1, tip:2 },
+  i:   { unit:'A',  color:'--c-current', get:p=>p.i,   now:2, tip:2 },
+  v:   { unit:'V',  color:'--c-volt',    get:p=>p.v,   now:2, tip:2 },
+  soc: { unit:'%',  color:'--c-soc',     get:p=>p.soc, now:0, tip:0 },
+  d:   { unit:'mV', color:'--warn',      get:p=>p.d,   now:0, tip:0 },
+  tc:  { unit:'°C', color:'--err',       get:p=>p.tc,  now:1, tip:1 },
 };
+
+/* Axis/tooltip time: add the date when the visible span is longer than ~a day. */
+function formatTime(ts, span, tooltip){
+  const d = new Date(ts), p2 = x => String(x).padStart(2, '0');
+  const date = `${p2(d.getDate())}.${p2(d.getMonth()+1)}`;
+  if (span > 20 * 3600000) return tooltip ? `${date} ${hhmmss(ts)}` : `${date} ${p2(d.getHours())}:${p2(d.getMinutes())}`;
+  if (span > 2 * 3600000 && !tooltip) return `${p2(d.getHours())}:${p2(d.getMinutes())}`;
+  return hhmmss(ts);
+}
 
 function niceDecimals(span, unit){ if (unit==='%') return 0; return span >= 20 ? 0 : span >= 2 ? 1 : 2; }
 
-/* getPoints(): array of {t, w, i, v, soc}; nowEl: element for the "Now: …" label. */
-export function createChart(canvas, wrap, nowEl, getPoints){
+/* getPoints(): array of {t, w, i, v, soc, d, tc}; nowEl: element for the "Now: …" label (or null).
+   opts.gapMs(): line-break threshold for this data (default CHART_GAP_MS). */
+export function createChart(canvas, wrap, nowEl, getPoints, opts = {}){
   const ctx = canvas.getContext('2d');
   let metricKey = 'w';
   let hoverX = null;
@@ -29,7 +42,8 @@ export function createChart(canvas, wrap, nowEl, getPoints){
     const metric = METRICS[metricKey];
     const pts = getPoints().filter(p=>isNum(metric.get(p)));
     const n = pts.length;
-    nowEl.innerHTML = n ? `${t('chart.now')} <b>${metric.get(pts[n-1]).toFixed(metricKey==='soc'?0:metricKey==='w'?1:2)} ${metric.unit}</b>` : '';
+    if (nowEl) nowEl.innerHTML = n ? `${t('chart.now')} <b>${metric.get(pts[n-1]).toFixed(metric.now)} ${metric.unit}</b>` : '';
+    const gapMs = opts.gapMs ? opts.gapMs() : CHART_GAP_MS;
 
     const w = canvas.clientWidth, h = canvas.clientHeight;
     if (!w || !h) return;
@@ -84,7 +98,7 @@ export function createChart(canvas, wrap, nowEl, getPoints){
     const xTicks = pw > 300 ? 3 : 2;
     let prevLabel = '';
     for (let i=0;i<=xTicks;i++){
-      const label = hhmmss(t0 + dt*i/xTicks);
+      const label = formatTime(t0 + dt*i/xTicks, dt, false);
       if (label === prevLabel) continue;
       prevLabel = label;
       ctx.textAlign = i===0 ? 'left' : i===xTicks ? 'right' : 'center';
@@ -102,7 +116,7 @@ export function createChart(canvas, wrap, nowEl, getPoints){
     // split into segments at gaps
     const segs = []; let cur = [];
     for (let i=0;i<n;i++){
-      if (i && pts[i].t - pts[i-1].t > CHART_GAP_MS){ segs.push(cur); cur = []; }
+      if (i && pts[i].t - pts[i-1].t > gapMs){ segs.push(cur); cur = []; }
       cur.push(pts[i]);
     }
     segs.push(cur);
@@ -140,7 +154,7 @@ export function createChart(canvas, wrap, nowEl, getPoints){
       ctx.beginPath(); ctx.moveTo(Math.round(x)+.5, PAD.t); ctx.lineTo(Math.round(x)+.5, PAD.t+ph); ctx.stroke();
       ctx.fillStyle = cSurface; ctx.strokeStyle = color; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-      const vtxt = `${metric.get(best).toFixed(metricKey==='soc'?0:2)} ${metric.unit}`, ttxt = hhmmss(best.t);
+      const vtxt = `${metric.get(best).toFixed(metric.tip)} ${metric.unit}`, ttxt = formatTime(best.t, dt, true);
       ctx.font = '600 12px system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
       const bw = Math.max(ctx.measureText(vtxt).width, ctx.measureText(ttxt).width) + 18, bh = 40;
       const bx = clamp(x + 10 + bw > PAD.l + pw ? x - 10 - bw : x + 10, PAD.l, PAD.l + pw - bw);

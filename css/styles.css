@@ -279,3 +279,38 @@ dialog::backdrop{background:rgba(5,8,14,.6);backdrop-filter:blur(2px)}
   .seg:not(.seg-sm){gap:2px;padding:3px}
   .seg:not(.seg-sm) button{font-size:12px;padding:0 2px}
 }
+
+/* ---------- Log ---------- */
+#chartWrap,#logChartWrap{border-radius:12px;overflow:hidden;background:var(--surface-2)}
+#logChart{width:100%;height:220px;display:block;touch-action:pan-y;cursor:crosshair}
+@media (min-width:900px){ #logChart{height:280px} }
+.mem-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.mem-head .btn{flex:none}
+.mem-status{font-size:13px;color:var(--muted)}
+.mem-status.err{color:var(--err)}
+#memResult,.log-body{display:flex;flex-direction:column;gap:10px}
+#memResult[hidden],.log-body[hidden]{display:none}
+.log-controls{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.log-summary{font-size:13px;color:var(--muted)}
+.log-file{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;border-radius:10px;background:var(--accent-soft);font-size:13px;font-weight:600;min-width:0}
+.log-file span{min-width:0;overflow-wrap:anywhere}
+.log-file .btn{flex:none}
+.log-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.log-table-wrap{max-height:340px;overflow:auto;border:1px solid var(--border);border-radius:12px}
+.log-table{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}
+.log-table th,.log-table td{padding:6px 9px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--border)}
+.log-table th{position:sticky;top:0;background:var(--surface-2);color:var(--muted);font-weight:600;z-index:1}
+.log-table th:first-child,.log-table td:first-child{text-align:left}
+.log-table td:last-child,.log-table th:last-child{text-align:left}
+.log-table tr:last-child td{border-bottom:0}
+.log-table tr.err td{color:var(--err)}
+.log-table tr.warn td:last-child{color:var(--warn);font-weight:600}
+.log-table .rel{display:block;color:var(--faint);font-size:11px}
+.empty-sm{padding:14px 12px}
+#memCounters:empty{display:none}
+#memCounters dd.hit{color:var(--warn)}
+
+/* Tab bar: labels keep their full width; on narrow screens the bar scrolls sideways */
+.tabbar{overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.tabbar::-webkit-scrollbar{display:none}
+.tabbar button{flex:1 0 auto;overflow:visible;text-overflow:clip}

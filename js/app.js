@@ -7,6 +7,8 @@ import { MAX_CELLS, CHG, createState, applyUpdate, powerW, activeCells, maxTemp,
 import { createSession, sessionAddSummary, sessionAddCells } from './session.js';
 import { createChart, METRICS } from './chart.js';
 import { initOffline } from './offline.js';
+import { createLog } from './log.js';
+import { createBmsMemory } from './bmsmemory.js';
 
 /* ================= Config ================= */
 const RECONNECT_MAX_ATTEMPTS = 8;
@@ -70,6 +72,7 @@ function onBatteryData(bat, p){
     sessionAddSummary(bat.session, { v:s.totalV, i:s.current, soc:s.soc, temps:[s.temp1, s.temp2, s.tmos] }, now);
   }
   if (res.cells) sessionAddCells(bat.session, s.cells);
+  if (res.summary) log.record(bat, now);
   scheduleRender();
 }
 
@@ -142,7 +145,7 @@ async function connectBattery(bat, opts = {}){
     setBatStatus(bat, 'status.connecting', 'warn', { name });
     if (opts.advertise) await waitForAdvertisement(device, 8000);
     const server = await withTimeout(device.gatt.connect(), CONNECT_TIMEOUT_MS, t('err.timeout'));
-    const driver = await createDriver(server, p => onBatteryData(bat, p));
+    const driver = await createDriver(server, p => onBatteryData(bat, p), (kind, frame) => log.raw(bat, kind, frame));
     bat.driver = driver;
     await driver.start();
     bat.connected = true;
@@ -234,7 +237,7 @@ const det = { name: $('#detName'), kind: $('#detKind'), model: $('#detModel'), c
 const wakeLockChk = $('#wakeLock');
 
 /* ================= Tabs ================= */
-const TABS = ['cells','chart','session','details'];
+const TABS = ['cells','chart','session','log','details'];
 const tabBtns = Object.fromEntries(TABS.map(n=>[n, $(`#tab-${n}-btn`)]));
 const tabPanels = Object.fromEntries(TABS.map(n=>[n, $(`#tab-${n}`)]));
 let activeTab = 'cells';
@@ -247,7 +250,9 @@ function setTab(name){
     tabPanels[n].classList.toggle('active', on);
   }
   storageSet(STORAGE_KEYS.tab, activeTab);
+  tabBtns[activeTab].scrollIntoView({ block: 'nearest', inline: 'nearest' });
   if (activeTab === 'chart') requestAnimationFrame(chart.resize); // why: скрытый canvas имеет размер 0x0
+  log.setActive(activeTab === 'log');
   render();
 }
 for (const n of TABS) tabBtns[n].addEventListener('click', ()=>setTab(n));
@@ -261,6 +266,10 @@ function setChartMetric(m){
   storageSet(STORAGE_KEYS.metric, chart.metric);
 }
 for (const b of chartMetricBtns) b.addEventListener('click', ()=>setChartMetric(b.dataset.metric));
+
+/* ================= Log (browser) and BMS memory ================= */
+const log = createLog({ getBatteries: () => batteries, getSelectedId: () => currentView().bat?.id ?? null });
+const bmsMemory = createBmsMemory({ getView: currentView });
 
 /* ================= Formatting ================= */
 function formatEtaHours(hrs){
@@ -656,6 +665,7 @@ function render(){
   else { overviewEl.hidden = true; renderCells(s); }
   if (activeTab === 'chart') chart.draw();
   if (activeTab === 'session') renderSession(v);
+  if (activeTab === 'log') bmsMemory.render();
   if (activeTab === 'details') renderDetails(v);
 }
 
@@ -779,6 +789,7 @@ function applyLanguage(){
   langSelect.options[0].textContent = t('det.langAuto', {lang: LANG_NAMES[detectLang()]});
   langSelect.value = getLangPref();
   overviewCards.clear(); overviewEl.replaceChildren(); // rebuilt with translated labels
+  log.applyLanguage();
   render();
 }
 langSelect.addEventListener('change', ()=>{ setLangPref(langSelect.value); applyLanguage(); });
@@ -797,6 +808,7 @@ setInterval(()=>{
   const connected = v.bat ? v.bat.connected : batteries.some(b=>b.connected);
   const stale = s.lastSummaryTs && (!connected || now - s.lastSummaryTs > STALE_AFTER_MS);
   metricsCard.classList.toggle('stale', !!stale);
+  log.tick();
   if (v.all || activeTab === 'session' || activeTab === 'details') render();
 }, 1000);
 

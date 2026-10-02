@@ -24,6 +24,10 @@ export function jbdHwInfo({ v = 5320, i = -1234, rem = 8000, full = 10000, cycle
 /* Cell voltages (0x04) in mV. */
 export function jbdCells(mv){ const d = []; for (const v of mv) d.push(...be16(v)); return jbdFrame(0x04, d); }
 export function jbdVersion(text){ return jbdFrame(0x05, [...text].map(c => c.charCodeAt(0))); }
+/* Protection counters (0xAA): u16 big-endian each; status 0x80 = rejected (not in factory mode). */
+export function jbdCounters(counts, status = 0){ const d = []; for (const n of counts) d.push(...be16(n)); return jbdFrame(0xAA, status ? [] : d, status); }
+/* Acknowledge of a register write (DD reg 00 00 crc 77). */
+export function jbdWriteAck(reg){ return jbdFrame(reg, []); }
 
 /* ---------- JK ---------- */
 export function jkHeader(type, size = 300){ const f = new Array(size).fill(0); f.splice(0, 6, 0x55, 0xaa, 0xeb, 0x90, type, 0x01); return f; }
@@ -58,9 +62,17 @@ export function jkSettings({ uvp = 2800, ovp = 3650, soc100 = 3450, soc0 = 2900 
   return jkSeal(f);
 }
 /* JK device-info frame (type 0x03). */
-export function jkDeviceInfo({ model = 'JK_B2A8S20P', hw = '11.XW', sw = '11.26' } = {}){
+export function jkDeviceInfo({ model = 'JK_B2A8S20P', hw = '11.XW', sw = '11.26', uptime = 0, powerOnCount = 0 } = {}){
   const f = jkHeader(0x03);
   const put = (pos, s, n) => [...s].slice(0, n).forEach((c, i) => { f[pos + i] = c.charCodeAt(0); });
   put(6, model, 16); put(22, hw, 8); put(30, sw, 8);
+  f.splice(38, 4, ...le32(uptime)); f.splice(42, 4, ...le32(powerOnCount));
+  return jkSeal(f);
+}
+/* JK logbook (type 0x05): count at 6, entries {ts (s of run time), code} of 5 bytes from 11, max 50. */
+export function jkLogbook(entries, count = entries.length){
+  const f = jkHeader(0x05);
+  f.splice(6, 4, ...le32(count));
+  entries.slice(0, 50).forEach((e, i) => { f.splice(11 + i * 5, 4, ...le32(e.ts)); f[15 + i * 5] = e.code; });
   return jkSeal(f);
 }

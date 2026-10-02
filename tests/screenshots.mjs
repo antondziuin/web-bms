@@ -20,16 +20,16 @@ fs.mkdirSync(OUT, { recursive: true });
 const server = await startServer();
 const browser = await chromium.launch();
 
-/* Opens the app with two JBD packs connected and `minutes` of simulated history. */
-async function setup({ locale, viewport, scale, scheme, minutes = 10 }){
+/* Opens the app with the given packs connected and `minutes` of simulated history. */
+async function setup({ locale, viewport, scale, scheme, minutes = 10, devices = 'jbd:House-A,jbd:House-B' }){
   // reducedMotion: no CSS transitions caught half-way in a screenshot
   const ctx = await browser.newContext({ locale, viewport, deviceScaleFactor: scale, colorScheme: scheme, reducedMotion: 'reduce' });
   await ctx.addInitScript(HIDE_OFFLINE_BANNER);
   await ctx.addInitScript(MOCK);
   const page = await ctx.newPage();
   await page.clock.install({ time: START });
-  await page.goto(server.url + 'index.html?wave=1&devices=jbd:House-A,jbd:House-B');
-  for (let n = 0; n < 2; n++){
+  await page.goto(server.url + `index.html?wave=1&devices=${devices}`);
+  for (let n = 0; n < devices.split(',').length; n++){
     if (!(await page.evaluate(() => document.getElementById('dlg-picker').open))) await page.click('#btn-bt');
     await page.click('#btn-choose');
     await page.clock.runFor(1500);
@@ -67,6 +67,17 @@ for (const [lang, locale] of Object.entries(LANGS)){
   await page.mouse.move(0, 0);
   await show(page, { battery: 1, tab: 'cells' });
   await shoot(page, `desktop-light-${lang}.png`);
+  await ctx.close();
+
+  // Desktop, light: the Log tab — event log read from a JK BMS and 30 minutes recorded in the browser
+  ({ ctx, page } = await setup({ locale, viewport: { width: 1280, height: 1120 }, scale: 1, scheme: 'light', minutes: 30, devices: 'jk:JK-B2A8S20P' }));
+  await page.click('#tab-log-btn');
+  await page.click('#memRead');
+  await page.clock.runFor(1500);
+  await page.waitForSelector('#memResult:not([hidden])');
+  await page.click('#logMetric [data-metric=i]');
+  await page.clock.runFor(1200);
+  await shoot(page, `desktop-log-${lang}.png`);
   await ctx.close();
 
   // Phone, dark: overview of all batteries

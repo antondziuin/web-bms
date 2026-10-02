@@ -1,10 +1,11 @@
 /* Service worker for offline use. Registered only when the user enables "Work offline".
    Network-first: online users always get the latest deploy; offline falls back to the cached copy. */
-const CACHE = 'web-bms-v1';
+const CACHE = 'web-bms-v2';
 const ASSETS = [
   './', './index.html', './manifest.webmanifest', './icon.svg', './css/styles.css',
-  './js/app.js', './js/ble.js', './js/chart.js', './js/i18n.js', './js/model.js',
-  './js/offline.js', './js/protocols.js', './js/session.js', './js/util.js',
+  './js/app.js', './js/ble.js', './js/bmsmemory.js', './js/chart.js', './js/i18n.js', './js/log.js',
+  './js/logformat.js', './js/logstore.js', './js/model.js', './js/offline.js', './js/protocols.js',
+  './js/session.js', './js/util.js',
 ];
 const NETWORK_TIMEOUT_MS = 5000;
 
