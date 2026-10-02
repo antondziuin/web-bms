@@ -15,7 +15,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install Chromium for Playwright
+        run: npx playwright install --with-deps chromium
+
+      - run: npm test
+
   deploy:
+    needs: test
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -26,7 +44,7 @@ jobs:
       - name: Assemble site
         run: |
           mkdir -p _site
-          cp index.html manifest.webmanifest icon.svg _site/
+          cp -r index.html manifest.webmanifest icon.svg sw.js css js _site/
           touch _site/.nojekyll
 
       - uses: actions/configure-pages@v5
