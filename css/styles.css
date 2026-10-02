@@ -39,7 +39,7 @@ button{font:inherit;color:inherit}
 .app{max-width:1120px;margin:0 auto;padding:12px 16px calc(20px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:14px}
 
 /* ---------- Top bar ---------- */
-.topbar{display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:5;margin:0 -16px;padding:10px 16px;background:color-mix(in srgb, var(--bg) 85%, transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.topbar{display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:5;margin:0 -16px;padding:10px 16px;background:var(--bg)}
 .brand{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
 .brand-logo{width:36px;height:36px;flex:none;border-radius:10px}
 .brand-text{min-width:0}
@@ -99,11 +99,11 @@ button{font:inherit;color:inherit}
 /* ---------- Metric tiles ---------- */
 .metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .tile{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;min-width:0;box-shadow:var(--shadow)}
-.tile-label{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.tile-label{font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;align-items:center;column-gap:5px}
 .tile-label svg{width:14px;height:14px;opacity:.8}
 .tile-value{margin-top:4px;font-size:22px;font-weight:700;line-height:1.15;display:flex;align-items:baseline;gap:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tile-value .unit{font-size:13px;font-weight:600;color:var(--muted)}
-.tile-sub{font-size:12px;color:var(--faint);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile-sub{font-size:12px;color:var(--faint);margin-top:2px;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}
 .tile.warn{border-color:color-mix(in srgb, var(--warn) 45%, var(--border))}
 .tile.warn .tile-value{color:var(--warn)}
 
@@ -118,11 +118,11 @@ button{font:inherit;color:inherit}
 /* ---------- Tabs / segmented ---------- */
 .panel-card{padding:14px;display:flex;flex-direction:column;gap:14px;min-width:0}
 .seg{display:flex;gap:4px;padding:4px;background:var(--surface-2);border-radius:12px}
-.seg button{flex:1;height:34px;border:0;border-radius:9px;background:transparent;color:var(--muted);font-weight:600;cursor:pointer;transition:background .15s,color .15s}
+.seg button{flex:1;min-width:0;height:34px;padding:0 6px;border:0;border-radius:9px;background:transparent;color:var(--muted);font-weight:600;cursor:pointer;transition:background .15s,color .15s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .seg button:hover{color:var(--text)}
 .seg button.active,.seg button[aria-pressed="true"]{background:var(--seg-active);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.18)}
-.seg-sm{align-self:flex-start}
-.seg-sm button{height:28px;padding:0 12px;flex:none;font-size:12px}
+.seg-sm{align-self:flex-start;flex-wrap:wrap;max-width:100%}
+.seg-sm button{height:28px;padding:0 12px;flex:1 1 auto;font-size:12px}
 .panel{display:none;flex-direction:column;gap:12px;min-width:0}
 .panel.active{display:flex}
 
@@ -253,4 +253,29 @@ dialog::backdrop{background:rgba(5,8,14,.6);backdrop-filter:blur(2px)}
   .kv-session{grid-template-columns:1fr}
   .kv-session dt{border-bottom:0;padding-bottom:0;font-size:12px}
   .kv-session dd{text-align:left;padding-top:2px}
+}
+
+/* ---------- Narrow phones (≤ 380 px) ---------- */
+@media (max-width:380px){
+  .app{padding-left:12px;padding-right:12px}
+  .topbar,.batbar{margin-left:-12px;margin-right:-12px;padding-left:12px;padding-right:12px}
+  .hero{gap:12px;padding:14px}
+  .gauge{width:108px;height:108px}
+  .gauge-val{font-size:26px}
+  #powerVal{font-size:38px}
+  .tile{padding:10px 11px}
+  .tile-value{font-size:20px}
+  .panel-card{padding:12px}
+  .cells-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .energy{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .energy-card:last-child{grid-column:1 / -1}
+  .energy-val{font-size:16px}
+  .btn{padding:0 12px}
+}
+@media (max-width:420px){
+  .seg:not(.seg-sm) button{font-size:13px;padding:0 4px}
+}
+@media (max-width:340px){
+  .seg:not(.seg-sm){gap:2px;padding:3px}
+  .seg:not(.seg-sm) button{font-size:12px;padding:0 2px}
 }

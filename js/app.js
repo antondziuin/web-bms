@@ -362,7 +362,7 @@ function renderOverview(){
       el.innerHTML = `<div class="bat-card-head"><span class="dot"></span><span class="bat-card-name"></span><span class="bat-card-kind"></span></div>
         <div class="bat-card-soc"><b class="soc"></b><div class="bat-card-bar"><i></i></div></div>
         <div class="bat-card-grid"><div>V<b class="v"></b></div><div>A<b class="a"></b></div><div>W<b class="w"></b></div>
-        <div>Δ mV<b class="d"></b></div><div>°C<b class="tc"></b></div><div class="st-label">&nbsp;<b class="st"></b></div></div>`;
+        <div>Δ mV<b class="d"></b></div><div>°C<b class="tc"></b></div><div>Ah<b class="sc"></b></div></div>`;
       el.addEventListener('click', ()=> select(bat.id));
       overviewCards.set(bat.id, el);
     }
@@ -370,7 +370,9 @@ function renderOverview(){
     const s = bat.state;
     el.dataset.tone = bat.status.tone || 'idle';
     el.querySelector('.bat-card-name').textContent = devName(bat.device);
-    el.querySelector('.bat-card-kind').textContent = bat.driver?.kind || '';
+    // why: статус показываем вместо протокола — в сетке значений длинный «немає зв’язку» не помещается
+    el.querySelector('.bat-card-kind').textContent = bat.connected ? (bat.driver?.kind || '') : bat.busy ? t('ov.connecting') : t('ov.offline');
+    el.querySelector('.bat-card-name').title = devName(bat.device);
     el.querySelector('.soc').textContent = isNum(s.soc) ? `${s.soc.toFixed(0)}%` : '—';
     el.querySelector('.bat-card-bar i').style.width = `${isNum(s.soc) ? clamp(s.soc,0,100) : 0}%`;
     el.querySelector('.v').textContent = num(s.totalV, 2);
@@ -380,7 +382,7 @@ function renderOverview(){
     const act = activeCells(s);
     el.querySelector('.d').textContent = act.length > 1 ? ((Math.max(...act)-Math.min(...act))*1000).toFixed(0) : '—';
     el.querySelector('.tc').textContent = num(maxTemp(s), 1);
-    el.querySelector('.st').textContent = bat.connected ? '' : bat.busy ? t('ov.connecting') : t('ov.offline');
+    el.querySelector('.sc').textContent = num(s.capRem, 1);
   }
 }
 
@@ -474,6 +476,7 @@ function renderHud(s){
     for (const b of batteries){ const a = activeCells(b.state); if (a.length > 1){ const d = (Math.max(...a)-Math.min(...a))*1000; if (d > wd){ wd = d; worst = b; } } }
     hud.delta.textContent = worst ? wd.toFixed(0) : '—';
     hud.deltaSub.textContent = worst ? devName(worst.device) : ' ';
+    hud.deltaSub.title = worst ? devName(worst.device) : '';
     hud.deltaTile.classList.toggle('warn', wd >= 50);
   }
 
