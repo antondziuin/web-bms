@@ -109,10 +109,11 @@
 
       <section class="col col-right">
         <div class="card panel-card">
-          <div class="seg" role="tablist">
+          <div class="seg tabbar" id="tabBar" role="tablist">
             <button id="tab-cells-btn" class="active" role="tab" aria-controls="tab-cells" aria-selected="true" data-tab="cells" data-i18n="tab.cells">Ячейки</button>
             <button id="tab-chart-btn" role="tab" aria-controls="tab-chart" aria-selected="false" data-tab="chart" data-i18n="tab.chart">График</button>
             <button id="tab-session-btn" role="tab" aria-controls="tab-session" aria-selected="false" data-tab="session" data-i18n="tab.session">Сессия</button>
+            <button id="tab-log-btn" role="tab" aria-controls="tab-log" aria-selected="false" data-tab="log" data-i18n="tab.log">Журнал</button>
             <button id="tab-details-btn" role="tab" aria-controls="tab-details" aria-selected="false" data-tab="details" data-i18n="tab.details">Детали</button>
           </div>
 
@@ -173,6 +174,95 @@
                 <dt data-i18n="ses.deltaMax">Макс. разбаланс</dt><dd id="sesDelta" class="num">—</dd>
                 <dt data-i18n="ses.tMax">Макс. температура</dt><dd id="sesTMax" class="num">—</dd>
               </dl>
+            </div>
+          </div>
+
+          <div id="tab-log" class="panel" role="tabpanel" aria-labelledby="tab-log-btn">
+            <!-- Event log / counters stored in the BMS itself -->
+            <div class="section-title" data-i18n="mem.title">Память BMS</div>
+            <div class="mem-head">
+              <div class="setting-sub" id="memSub"></div>
+              <button class="btn btn-primary btn-sm" id="memRead" data-i18n="mem.read">Считать из BMS</button>
+            </div>
+            <div class="mem-status" id="memStatus" hidden></div>
+            <div id="memResult" hidden>
+              <div class="raw-head">
+                <div class="log-summary" id="memSummary"></div>
+                <button class="btn btn-sm" id="memCsv" data-i18n="mem.csv">Скачать CSV</button>
+              </div>
+              <div class="log-table-wrap" id="memTableWrap">
+                <table class="log-table">
+                  <thead><tr><th>#</th><th data-i18n="log.colTime">Время</th><th data-i18n="mem.colEvent">Событие</th></tr></thead>
+                  <tbody id="memRows"></tbody>
+                </table>
+              </div>
+              <div class="setting-sub" id="memNote"></div>
+              <dl class="kv" id="memCounters"></dl>
+            </div>
+
+            <!-- Log recorded by this app in the browser -->
+            <div class="section-title" data-i18n="log.browserTitle">Журнал в браузере</div>
+            <div class="log-file" id="logFileBar" hidden>
+              <span id="logFileName"></span>
+              <button class="btn btn-sm" id="logCloseFile" data-i18n="log.closeFile">К журналу</button>
+            </div>
+            <div class="log-controls">
+              <div class="seg seg-sm" id="logRange" role="group" aria-label="Период" data-i18n-aria="log.rangeAria">
+                <button data-range="1h" aria-pressed="false" data-i18n="log.r1h">1 ч</button>
+                <button data-range="6h" aria-pressed="true" data-i18n="log.r6h">6 ч</button>
+                <button data-range="24h" aria-pressed="false" data-i18n="log.r24h">24 ч</button>
+                <button data-range="all" aria-pressed="false" data-i18n="log.rAll">Всё</button>
+              </div>
+              <select id="logDevice" class="select" hidden></select>
+            </div>
+            <div class="log-summary" id="logSummary"></div>
+            <div class="mem-status err" id="logError" hidden></div>
+            <div class="empty empty-sm" id="logEmpty"><div id="logEmptyText"></div></div>
+            <div id="logBody" class="log-body" hidden>
+              <div class="seg seg-sm" id="logMetric" role="group" aria-label="Показатель" data-i18n-aria="log.metricAria">
+                <button data-metric="w" aria-pressed="true" data-i18n="metric.w">Мощность</button>
+                <button data-metric="i" aria-pressed="false" data-i18n="metric.i">Ток</button>
+                <button data-metric="v" aria-pressed="false" data-i18n="metric.v">Напряжение</button>
+                <button data-metric="soc" aria-pressed="false">SOC</button>
+                <button data-metric="d" aria-pressed="false" data-i18n="metric.d">Δ ячеек</button>
+                <button data-metric="tc" aria-pressed="false" data-i18n="metric.tc">Темп.</button>
+              </div>
+              <div id="logChartWrap"><canvas id="logChart"></canvas></div>
+              <div class="log-table-wrap" id="logTableWrap">
+                <table class="log-table">
+                  <thead><tr><th data-i18n="log.colTime">Время</th><th>V</th><th>A</th><th>W</th><th>SOC</th><th>Δ mV</th><th>°C</th><th data-i18n="log.colErrors">Ошибки</th></tr></thead>
+                  <tbody id="logRows"></tbody>
+                </table>
+              </div>
+              <button class="btn btn-sm" id="logMore" data-i18n="log.more">Показать ещё</button>
+            </div>
+            <div class="log-actions">
+              <span class="setting-sub" data-i18n="log.download">Скачать</span>
+              <button class="btn btn-sm" id="logCsv">CSV</button>
+              <button class="btn btn-sm" id="logJson">JSON</button>
+              <button class="btn btn-sm" id="logOpen" data-i18n="log.open">Открыть файл…</button>
+              <input type="file" id="logFile" accept=".json,.csv,application/json,text/csv" hidden>
+            </div>
+            <div class="settings">
+              <div class="setting-sub" id="logUnsupported" hidden data-i18n="log.unsupported">Этот браузер не может хранить журнал.</div>
+              <label class="setting">
+                <div><div data-i18n="log.enabled">Вести журнал</div><div class="setting-sub" id="logEnabledSub"></div></div>
+                <input id="logEnabled" class="switch" type="checkbox">
+              </label>
+              <label class="setting">
+                <div data-i18n="log.interval">Интервал записи</div>
+                <select id="logInterval" class="select">
+                  <option value="5"></option><option value="10"></option><option value="30"></option><option value="60"></option>
+                </select>
+              </label>
+              <label class="setting">
+                <div><div data-i18n="log.rawEnabled">Записывать сырые кадры BLE</div><div class="setting-sub" id="rawSub"></div></div>
+                <input id="rawEnabled" class="switch" type="checkbox">
+              </label>
+              <div class="log-actions">
+                <button class="btn btn-sm" id="rawDownload" data-i18n="log.rawDownload">Скачать кадры</button>
+                <button class="btn btn-sm btn-danger" id="logClear" data-i18n="log.clear">Очистить журнал</button>
+              </div>
             </div>
           </div>
 

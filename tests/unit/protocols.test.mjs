@@ -100,3 +100,31 @@ test('JK framer: chunked frames, back-to-back frames, resync after corruption', 
   assert.deepEqual(frames.map(f => f[4]), [0x02, 0x01]);
   assert.equal(frames[0].length, 300);
 });
+
+import { parseJkLogbook, jkLogEventName, jbdBuildWrite, JBD_PROTECTION_KEYS } from '../../js/protocols.js';
+import { jkLogbook, jkDeviceInfo as jkInfo, jbdCounters } from '../fixtures/frames.mjs';
+
+test('JK logbook frame (0x05): count, entries, event names', () => {
+  const p = parseJkFrame(jkLogbook([{ ts: 600, code: 0x01 }, { ts: 90000, code: 0x1D }, { ts: 90500, code: 0x6E }], 3));
+  assert.equal(p.jkLogbook.count, 3);
+  assert.deepEqual(p.jkLogbook.entries, [{ ts: 600, code: 1 }, { ts: 90000, code: 0x1D }, { ts: 90500, code: 0x6E }]);
+  assert.equal(jkLogEventName(0x1D), 'Cell undervoltage protection');
+  assert.equal(jkLogEventName(0x6E), 'Cell 11 over charge protection');
+  assert.equal(jkLogEventName(0xD0), 'Cell 09 over discharge protection');
+  assert.equal(jkLogEventName(0x99), 'Unknown (0x99)');
+  const many = Array.from({ length: 60 }, (_, i) => ({ ts: i, code: 1 }));
+  assert.equal(parseJkLogbook(jkLogbook(many, 60)).jkLogbook.entries.length, 50, 'one frame holds at most 50 entries');
+});
+
+test('JK device info carries the run time used to date logbook entries', () => {
+  const p = parseJkFrame(jkInfo({ uptime: 36867600, powerOnCount: 19 }));
+  assert.equal(p.uptime, 36867600); assert.equal(p.powerOnCount, 19);
+});
+
+test('JBD register write frame and protection counters', () => {
+  assert.deepEqual([...jbdBuildWrite(0x00, [0x56, 0x78])], [0xDD, 0x5A, 0x00, 0x02, 0x56, 0x78, 0xFF, 0x30, 0x77]);
+  assert.deepEqual([...jbdBuildWrite(0x01, [0x00, 0x00])], [0xDD, 0x5A, 0x01, 0x02, 0x00, 0x00, 0xFF, 0xFD, 0x77]);
+  assert.deepEqual(parseJbdFrame(jbdCounters([2, 0, 1, 5, 3, 0, 0, 0, 0, 0, 1])), { jbdCounters: [2, 0, 1, 5, 3, 0, 0, 0, 0, 0, 1] });
+  assert.deepEqual(parseJbdFrame(jbdCounters([], 0x80)), { jbdCountersError: 0x80 });
+  assert.equal(JBD_PROTECTION_KEYS.length, 11);
+});

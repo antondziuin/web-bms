@@ -3,7 +3,7 @@
 (() => {
   const CONTAINERS = '.card,.tile,.chip,.btn,.stat,.energy-card,.bat-card,.bat-chip,.cell-card,.kv dt,.kv dd,.setting,'
     + '.recent-item,.banner,dialog,.seg button,.flow,.conn,.topbar,.empty,.chart-head,.raw-head,.dlg-head,.gauge';
-  const SCROLLERS = '#batBar,#rawInfo,#recent-list';
+  const SCROLLERS = '#batBar,#rawInfo,#recent-list,#tabBar,.log-table-wrap';
   // Intentionally ellipsized: long statuses and device names (full text is in the title / details).
   const ELLIPSIS_OK = '#statusBar,.bat-chip .name,.bat-card-name';
   const issues = [];

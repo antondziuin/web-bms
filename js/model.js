@@ -16,6 +16,7 @@ export function createState(){
     balancing:false, errors:'OK', cells:[], model:'',
     lastCellsTs:0, lastSummaryTs:0,
     cfgSoc0mV:NaN, cfgSoc100mV:NaN, cfgUvpMv:NaN, cfgOvpMv:NaN,
+    uptime:NaN, uptimeAt:0,
   };
 }
 
@@ -28,6 +29,7 @@ export function applyUpdate(state, p, now = Date.now()){
   if (typeof p.balancing === 'boolean') state.balancing = p.balancing;
   if (typeof p.errors === 'string' && p.errors) state.errors = p.errors;
   if (typeof p.model === 'string' && p.model) state.model = p.model;
+  if (isNum(p.uptime)){ state.uptime = p.uptime; state.uptimeAt = now; } // JK run time, to date logbook entries
   if (Array.isArray(p.cells) && p.cells.length){ state.cells = p.cells.slice(0, MAX_CELLS); state.lastCellsTs = now; res.cells = true; }
   if (isNum(p.totalV) || isNum(p.current)){ state.lastSummaryTs = now; res.summary = true; }
   return res;
