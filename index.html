@@ -1,0 +1,1246 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0a0f16" />
+  <meta name="description" content="Монитор BMS JK / JBD через Web Bluetooth: напряжение, ток, SOC, ячейки, график мощности." />
+  <title>Battery monitor — Web Bluetooth</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <style>
+    :root{
+      --text:#e7eef7; --muted:#9fb6d9; --accent:#2b78ff;
+      --bg:#0a0f16; --panel:#0f1520; --border:#23324a;
+      --ok:#1db954; --warn:#ffb020; --err:#ef3921;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;overflow:hidden}
+    body{margin:0;background:var(--bg);color:var(--text);font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;overscroll-behavior:none}
+    .app{width:min(420px,100vw);height:100dvh;margin:0 auto;display:flex;flex-direction:column;gap:10px;padding:10px;padding-bottom:max(10px,env(safe-area-inset-bottom));overflow:hidden}
+    /* why: на низких экранах (телефон в ландшафте) панели иначе схлопываются в 0 */
+    @media (max-height:640px){
+      html,body{overflow:auto}
+      .app{height:auto;min-height:100dvh;overflow:visible}
+      .panels{min-height:320px}
+    }
+    button{font:inherit}
+
+    /* Topbar */
+    .topbar{display:flex;align-items:center;justify-content:space-between;gap:8px}
+    #statusBar{font-weight:600;opacity:.9;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+    #btn-bt{flex:none;height:32px;padding:0 12px;border-radius:10px;border:1px solid var(--border);background:var(--panel);color:var(--text);cursor:pointer;font-weight:700}
+    #btn-bt.connected{border-color:#1d4d2c;color:#7ff0a8}
+    #btn-bt[disabled]{opacity:.5;pointer-events:none}
+
+    /* Metrics */
+    .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:12px;transition:opacity .3s}
+    .card.stale{opacity:.55}
+    .power-line{display:flex;align-items:baseline;gap:10px}
+    #powerVal{font-weight:800;letter-spacing:.3px;font-size:44px;line-height:1;font-variant-numeric:tabular-nums}
+    .unit{opacity:.7;font-size:14px;font-weight:700}
+    .va-line{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px}
+    .tile{background:#0c121c;border:1px solid var(--border);border-radius:12px;padding:8px;min-width:0}
+    .label{font-size:11px;opacity:.75}
+    .value{margin-top:2px;font-size:20px;font-weight:700;display:flex;align-items:baseline;gap:6px;font-variant-numeric:tabular-nums;white-space:nowrap}
+    .switches{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+    .sw{display:flex;align-items:center;gap:6px;font-size:12px;padding:6px 8px;border-radius:10px;border:1px solid var(--border);background:#0b121b;cursor:pointer;user-select:none}
+    .sw[hidden]{display:none}
+    .meta-line{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+    .pill{font-size:11px;padding:6px 10px;border-radius:999px;border:1px solid var(--border);background:#0c121b;white-space:nowrap}
+    .pill[hidden]{display:none}
+    .pill.ok{border-color:#16351f}
+    .pill.on{border-color:#1f3f78;color:#9cc2ff}
+    .pill.warn{border-color:#3a2d12}
+    .pill.err{border-color:#3b1716;background:#1a0b0b;white-space:normal}
+
+    /* Tabs */
+    .tabs{display:flex;gap:6px}
+    .tab-btn{flex:1;height:34px;border-radius:10px;border:1px solid var(--border);background:#0c121c;color:var(--text);font-weight:700;cursor:pointer}
+    .tab-btn.active{background:#142035}
+    .panels{display:flex;flex-direction:column;gap:10px;min-height:0;flex:1;overflow:hidden}
+    .panel{display:none;min-height:0;flex:1;overflow:auto}
+    .panel.active{display:flex;flex-direction:column}
+
+    /* Cells */
+    #cellsSimple{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;min-height:0}
+    .cells-empty{opacity:.6;font-size:12px;padding:8px 2px}
+    .cell-card{background:#0c121c;border:1px solid var(--border);border-radius:12px;padding:8px;display:flex;flex-direction:column;gap:6px;min-width:0}
+    .cell-card[hidden]{display:none}
+    .cell-top{display:flex;justify-content:space-between;align-items:center;gap:4px}
+    .cell-idx{font-size:11px;opacity:.7}
+    .cell-val{font-weight:700;font-size:15px;font-variant-numeric:tabular-nums;white-space:nowrap}
+    .cell-bar{height:6px;border-radius:6px;background:#0f1520;border:1px solid #1b2941;overflow:hidden}
+    .cell-fill{height:100%;width:0%;background:linear-gradient(90deg,#2b78ff,#42f59e);transition:width .3s}
+    .cell-flag{font-size:10px;opacity:.85;min-height:1.2em}
+    .flag-min{color:#ff7676}
+    .flag-max{color:#6fb7ff}
+    @media (max-width:360px){ #cellsSimple{grid-template-columns:repeat(3,1fr)} }
+
+    /* Raw info */
+    #rawInfo{white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Consolas,Monaco,monospace;font-size:12px;line-height:1.3;background:#0b111a;border:1px dashed var(--border);border-radius:10px;padding:10px;max-height:30vh;overflow:auto;flex:none}
+    #rawInfo[hidden]{display:none}
+
+    /* Chart */
+    #chartWrap{border:1px solid var(--border);border-radius:12px;overflow:hidden}
+    #chart{width:100%;height:220px;display:block;background:#0b111a}
+
+    /* Dialog */
+    dialog{border:1px solid var(--border);border-radius:12px;padding:12px;background:var(--panel);color:var(--text);width:min(400px,calc(100vw - 24px))}
+    dialog::backdrop{background:rgba(0,0,0,.55)}
+    .dlg-btn{height:32px;padding:0 12px;border-radius:8px;border:1px solid var(--border);background:#131b27;color:var(--text);cursor:pointer}
+    .dlg-btn.primary{border:0;background:var(--accent);color:#fff}
+    .dlg-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0}
+    #picker-status{font-size:12px;opacity:.85;min-height:1.3em}
+    #recent-list{max-height:36vh;overflow:auto;border:1px solid var(--border);border-radius:10px;padding:6px;background:#0f1520}
+    .recent-item{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px;border-radius:8px;border:1px solid var(--border);margin:4px 0}
+    .recent-item>div{min-width:0;overflow-wrap:anywhere}
+    .recent-item>button{flex:none}
+    .recent-item .id{opacity:.7;font-size:12px;word-break:break-all}
+  </style>
+</head>
+<body>
+  <div class="app" id="app">
+    <div class="topbar">
+      <div id="statusBar" role="status" aria-live="polite">Battery monitor — Idle</div>
+      <button id="btn-bt" title="Bluetooth: подключить / отключить">BT</button>
+    </div>
+
+    <div class="card" id="metricsCard">
+      <div class="power-line">
+        <span id="powerVal">—</span><span class="unit">W</span>
+      </div>
+      <div class="va-line">
+        <div class="tile">
+          <div class="label">Вольты</div>
+          <div class="value"><span id="voltVal">—</span><span class="unit">V</span></div>
+        </div>
+        <div class="tile">
+          <div class="label">Амперы</div>
+          <div class="value"><span id="ampVal">—</span><span class="unit">A</span></div>
+        </div>
+        <div class="tile">
+          <div class="label">SOC</div>
+          <div class="value"><span id="socVal">—</span><span class="unit">%</span></div>
+        </div>
+        <div class="tile">
+          <div class="label">Остаток</div>
+          <div class="value"><span id="capRemVal">—</span><span class="unit">Ah</span></div>
+        </div>
+        <div class="tile">
+          <div class="label" id="etaLabel">Время</div>
+          <div class="value"><span id="etaVal">—</span></div>
+        </div>
+        <div class="tile">
+          <div class="label">Разбаланс ячеек</div>
+          <div class="value"><span id="deltaVal">—</span><span class="unit">mV</span></div>
+        </div>
+      </div>
+      <div class="switches">
+        <label class="sw"><input id="showRaw" type="checkbox">Raw</label>
+        <label class="sw" title="Отправлять данные на сервер логирования"><input id="cloudLog" type="checkbox">Cloud log</label>
+        <label class="sw" id="wakeLockSw" title="Не давать экрану гаснуть, пока страница открыта" hidden><input id="wakeLock" type="checkbox">Экран вкл.</label>
+      </div>
+      <div class="meta-line">
+        <div class="pill" id="balancingPill">Balancing: OFF</div>
+        <div class="pill" id="tempsPill">T1 — · T2 —</div>
+        <div class="pill" id="cyclesPill" hidden>Циклы —</div>
+        <div class="pill ok" id="errorsPill">OK</div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs" role="tablist">
+      <button id="tab-cells-btn" class="tab-btn active" role="tab" aria-controls="tab-cells" aria-selected="true">Ячейки</button>
+      <button id="tab-chart-btn" class="tab-btn" role="tab" aria-controls="tab-chart" aria-selected="false">График</button>
+    </div>
+    <div class="panels">
+      <div id="tab-cells" class="panel active" role="tabpanel" aria-labelledby="tab-cells-btn">
+        <div id="cellsEmpty" class="cells-empty">Нет данных по ячейкам. Нажмите «BT», чтобы подключиться к BMS.</div>
+        <div id="cellsSimple" aria-label="Поклеточные напряжения"></div>
+      </div>
+      <div id="tab-chart" class="panel" role="tabpanel" aria-labelledby="tab-chart-btn">
+        <div id="chartWrap"><canvas id="chart" aria-label="График мощности, W"></canvas></div>
+      </div>
+    </div>
+
+    <div id="rawInfo" hidden></div>
+
+    <!-- Picker -->
+    <dialog id="dlg-picker">
+      <h3 style="margin:0 0 8px 0">Подключение JK/JBD (BLE)</h3>
+      <div style="opacity:.8;font-size:12px">PIN вводится системным окном (обычно 123456). Web Bluetooth не даёт «сканирование 15с», только системный выбор устройства.</div>
+      <div class="dlg-row">
+        <button id="btn-choose" class="dlg-btn primary">Выбрать устройство…</button>
+        <button id="btn-reconnect" class="dlg-btn">Недавние</button>
+      </div>
+      <div id="picker-status"></div>
+      <div id="recent-list" hidden></div>
+      <div style="display:flex;justify-content:flex-end;margin-top:8px">
+        <button id="btn-close-picker" class="dlg-btn">Закрыть</button>
+      </div>
+    </dialog>
+  </div>
+
+<script>
+'use strict';
+
+/* ================= Config ================= */
+const MAX_CELLS = 32;
+const API_BASE = 'https://bms.area.pp.ua';
+const RECONNECT_MAX_ATTEMPTS = 8;
+const CONNECT_TIMEOUT_MS = 20000;
+const STALE_AFTER_MS = 10000;
+const MAX_POINTS = 1000;
+const DEFAULT_MIN_MV = 2900;
+const DEFAULT_MAX_MV = 4200;
+const STORAGE_KEYS = { lastDeviceId:'bt:lastDeviceId', cloudLog:'log:enabled', wakeLock:'ui:wakeLock', tab:'ui:tab' };
+
+const UUID = {
+  JK_SVC:'0000ffe0-0000-1000-8000-00805f9b34fb',
+  JK_CHR:'0000ffe1-0000-1000-8000-00805f9b34fb',
+  JBD_SVC:'0000ff00-0000-1000-8000-00805f9b34fb',
+  JBD_NOTIFY:'0000ff01-0000-1000-8000-00805f9b34fb',
+  JBD_CTRL:'0000ff02-0000-1000-8000-00805f9b34fb',
+};
+
+/* ================= Helpers ================= */
+const $ = sel => document.querySelector(sel);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const isNum = Number.isFinite;
+function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+function map(x,inMin,inMax,outMin,outMax){
+  if (!isNum(x)) return outMin;
+  if (Math.abs(inMax-inMin)<1e-9) return outMin;
+  return (x-inMin)*(outMax-outMin)/(inMax-inMin)+outMin;
+}
+function fmt(v,u,d){ return isNum(v)? `${v.toFixed(d)} ${u}` : `– ${u}`; }
+function errMsg(err){ return (err && (err.message || err.name)) || String(err); }
+function storageGet(key, def){ try{ const v = localStorage.getItem(key); return v===null ? def : v; }catch{ return def; } }
+function storageSet(key, val){ try{ localStorage.setItem(key, val); }catch{} }
+function withTimeout(promise, ms, label){
+  let t;
+  return Promise.race([
+    promise,
+    new Promise((_,rej)=>{ t = setTimeout(()=>rej(new Error(label||'Timeout')), ms); })
+  ]).finally(()=>clearTimeout(t));
+}
+/* человекочитаемая «свежесть» */
+function ago(ts,now){
+  if(!ts) return '—';
+  const ms = Math.max(0, now - ts);
+  if (ms < 1500) return 'now';
+  if (ms < 60000) return `${(ms/1000).toFixed(1)} s ago`;
+  if (ms < 3600000) return `${Math.floor(ms/60000)} m ago`;
+  if (ms < 86400000) return `${Math.floor(ms/3600000)} h ago`;
+  return `${Math.floor(ms/86400000)} d ago`;
+}
+
+/* ================= State ================= */
+const STATE = {
+  totalV:NaN, current:NaN, soc:NaN, capRem:NaN, capFull:NaN, cycles:NaN,
+  temp1:NaN, temp2:NaN, tmos:NaN,
+  balancing:false, errors:'OK', cells:[], model:'',
+  lastCellsTs:0, lastSummaryTs:0,
+  cfgSoc0mV:NaN, cfgSoc100mV:NaN,
+  cfgUvpMv:NaN,  cfgOvpMv:NaN,
+};
+function resetState(){
+  Object.assign(STATE, {
+    totalV:NaN, current:NaN, soc:NaN, capRem:NaN, capFull:NaN, cycles:NaN,
+    temp1:NaN, temp2:NaN, tmos:NaN, balancing:false, errors:'OK', cells:[], model:'',
+    lastCellsTs:0, lastSummaryTs:0, cfgSoc0mV:NaN, cfgSoc100mV:NaN, cfgUvpMv:NaN, cfgOvpMv:NaN,
+  });
+}
+
+/* Merge a parsed partial update into STATE. Only finite numbers overwrite. */
+function applyUpdate(p){
+  if (!p) return;
+  const now = Date.now();
+  for (const k of ['totalV','current','soc','capRem','capFull','cycles','temp1','temp2','tmos','cfgSoc0mV','cfgSoc100mV','cfgUvpMv','cfgOvpMv']){
+    if (isNum(p[k])) STATE[k] = p[k];
+  }
+  if (typeof p.balancing === 'boolean') STATE.balancing = p.balancing;
+  if (typeof p.errors === 'string' && p.errors) STATE.errors = p.errors;
+  if (typeof p.model === 'string' && p.model) STATE.model = p.model;
+  if (Array.isArray(p.cells) && p.cells.length){ STATE.cells = p.cells.slice(0, MAX_CELLS); STATE.lastCellsTs = now; }
+  if (isNum(p.totalV) || isNum(p.current)){
+    STATE.lastSummaryTs = now;
+    const w = STATE.totalV * STATE.current;
+    if (isNum(w)) pushChartPoint(w, now);
+  }
+  scheduleRender();
+}
+
+/* ================= Derived values ================= */
+function powerW(){ const w = STATE.totalV * STATE.current; return isNum(w) ? w : NaN; }
+function activeCells(){ return STATE.cells.filter(v=>isNum(v) && v>0); }
+function getCellScaleMv(){
+  const soc0 = STATE.cfgSoc0mV, soc100 = STATE.cfgSoc100mV;
+  if (isNum(soc0) && isNum(soc100) && soc100>soc0) return [soc0, soc100];
+  const uvp = STATE.cfgUvpMv, ovp = STATE.cfgOvpMv;
+  if (isNum(uvp) && isNum(ovp) && ovp>uvp) return [uvp, ovp];
+  return [DEFAULT_MIN_MV, DEFAULT_MAX_MV];
+}
+/* Ёмкость: из BMS, если известна; иначе оценка по SOC и остатку */
+const CHG = { MIN_CHG_A: 0.10, MIN_SOC: 1, IDLE_A: 0.01 };
+function estimateFullCapacityAh(){
+  const s = STATE.soc, r = STATE.capRem;
+  if (isNum(STATE.capFull) && STATE.capFull > 0 && (!isNum(r) || STATE.capFull >= r)) return STATE.capFull;
+  if (!isNum(s) || !isNum(r) || s < CHG.MIN_SOC || r <= 0) return NaN;
+  return r / (s/100);
+}
+/* returns {mode:'discharge'|'charge'|'idle'|null, hours:NaN|number} */
+function estimateEta(){
+  const i = STATE.current, rem = STATE.capRem;
+  if (!isNum(i) || !isNum(rem)) return {mode:null, hours:NaN};
+  if (i < -CHG.IDLE_A) return {mode:'discharge', hours: rem / (-i)};
+  if (i <= CHG.IDLE_A) return {mode:'idle', hours:NaN};
+  if (i <= CHG.MIN_CHG_A) return {mode:'charge', hours:NaN};
+  if (isNum(STATE.soc) && STATE.soc >= 100) return {mode:'charge', hours:0};
+  const full = estimateFullCapacityAh();
+  if (!isNum(full)) return {mode:'charge', hours:NaN};
+  return {mode:'charge', hours: Math.max(0, full - rem) / i};
+}
+function formatEtaHours(hrs){
+  if (!isNum(hrs) || hrs<0) return '—';
+  if (hrs===0) return '0 м';
+  const h = Math.floor(hrs);
+  const m = Math.floor((hrs - h) * 60);
+  if (h>=100) return `${h} ч`;
+  return h ? `${h} ч ${m} м` : `${m} м`;
+}
+
+/* ================= DOM refs ================= */
+const statusBar = $('#statusBar');
+const btnBtEl = $('#btn-bt');
+const metricsCard = $('#metricsCard');
+const rawInfo = $('#rawInfo');
+const hudPower = $('#powerVal');
+const hudVolt = $('#voltVal');
+const hudAmp = $('#ampVal');
+const hudSoc = $('#socVal');
+const hudCapRem = $('#capRemVal');
+const hudEta = $('#etaVal');
+const hudEtaLabel = $('#etaLabel');
+const hudDelta = $('#deltaVal');
+const hudBal = $('#balancingPill');
+const hudTemps = $('#tempsPill');
+const hudCycles = $('#cyclesPill');
+const hudErrors = $('#errorsPill');
+const showRaw = $('#showRaw');
+const cloudLogChk = $('#cloudLog');
+const wakeLockChk = $('#wakeLock');
+const cellsEmpty = $('#cellsEmpty');
+
+function setStatus(text){ statusBar.textContent = `Battery monitor — ${text}`; statusBar.title = statusBar.textContent; }
+function setBtState(s){
+  btnBtEl.textContent = s==='connected' ? 'BT✓' : s==='connecting' ? 'BT…' : 'BT';
+  btnBtEl.classList.toggle('connected', s==='connected');
+}
+
+/* ================= Tabs ================= */
+const tabCellsBtn = $('#tab-cells-btn');
+const tabChartBtn = $('#tab-chart-btn');
+const tabCells = $('#tab-cells');
+const tabChart = $('#tab-chart');
+function setTab(name){
+  const isCells = name!=='chart';
+  tabCellsBtn.classList.toggle('active', isCells);
+  tabChartBtn.classList.toggle('active', !isCells);
+  tabCells.classList.toggle('active', isCells);
+  tabChart.classList.toggle('active', !isCells);
+  tabCellsBtn.setAttribute('aria-selected', String(isCells));
+  tabChartBtn.setAttribute('aria-selected', String(!isCells));
+  storageSet(STORAGE_KEYS.tab, isCells ? 'cells' : 'chart');
+  if (!isCells) requestAnimationFrame(resizeChart); // why: при показе графика он может быть 0x0
+}
+tabCellsBtn.addEventListener('click', ()=>setTab('cells'));
+tabChartBtn.addEventListener('click', ()=>setTab('chart'));
+
+/* ================= Cells grid ================= */
+const cellsSimple = $('#cellsSimple');
+const simpleSlots = [];
+(function buildCellsSimple(){
+  for (let i=0;i<MAX_CELLS;i++){
+    const card = document.createElement('div'); card.className='cell-card'; card.hidden = true;
+    const top = document.createElement('div'); top.className='cell-top';
+    const idx = document.createElement('div'); idx.className='cell-idx'; idx.textContent = `C${String(i+1).padStart(2,'0')}`;
+    const val = document.createElement('div'); val.className='cell-val'; val.textContent='—';
+    top.append(idx, val);
+    const bar = document.createElement('div'); bar.className='cell-bar';
+    const fill = document.createElement('div'); fill.className='cell-fill'; bar.appendChild(fill);
+    const flag = document.createElement('div'); flag.className='cell-flag';
+    card.append(top, bar, flag);
+    cellsSimple.appendChild(card);
+    simpleSlots.push({cardEl:card, valEl:val, fillEl:fill, flagEl:flag});
+  }
+})();
+
+/* Cells updater (0 V = нет ячейки, скрываем) */
+function renderCells(){
+  const volts = STATE.cells;
+  const [minMv, maxMv] = getCellScaleMv();
+  const finite = activeCells();
+  const n = finite.length;
+  const min = n ? Math.min(...finite) : NaN;
+  const max = n ? Math.max(...finite) : NaN;
+  const avg = n ? finite.reduce((a,b)=>a+b,0)/n : NaN;
+  cellsEmpty.hidden = n > 0;
+
+  for (let i=0;i<MAX_CELLS;i++){
+    const v = volts[i];
+    const slot = simpleSlots[i];
+    if (!isNum(v) || v <= 0){ slot.cardEl.hidden = true; continue; }
+    slot.cardEl.hidden = false;
+    slot.valEl.textContent = v.toFixed(3)+' V';
+    const perc = clamp(Math.round(map(v*1000, minMv, maxMv, 0, 100)), 0, 100);
+    slot.fillEl.style.width = perc + '%';
+
+    let flagText = '', cls = 'cell-flag';
+    if (n > 1 && v === min && avg - v > 0.040) { flagText='LOW'; cls+=' flag-min'; }
+    else if (n > 1 && v === max && v - avg > 0.040) { flagText='HIGH'; cls+=' flag-max'; }
+    slot.flagEl.className = cls;
+    slot.flagEl.textContent = flagText;
+  }
+}
+
+/* ================= Chart ================= */
+const chartCanvas = $('#chart');
+const chartWrap = $('#chartWrap');
+const ctx = chartCanvas.getContext('2d');
+const chartData = [];
+const chartTime = [];
+const CHART_GAP_MS = 15000; // разрыв линии, если данных не было дольше
+
+function resizeChart(){
+  const rect = chartCanvas.getBoundingClientRect();
+  const cssW = Math.max(1, Math.floor(rect.width));
+  const cssH = Math.max(1, Math.floor(rect.height));
+  const dpr = window.devicePixelRatio || 1;
+  const pw = Math.max(1, Math.floor(cssW * dpr)), ph = Math.max(1, Math.floor(cssH * dpr));
+  if (chartCanvas.width !== pw || chartCanvas.height !== ph){
+    chartCanvas.width = pw; chartCanvas.height = ph;
+  }
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  drawChart();
+}
+window.addEventListener('resize', ()=>requestAnimationFrame(resizeChart), {passive:true});
+if ('ResizeObserver' in window){
+  try{ new ResizeObserver(()=>requestAnimationFrame(resizeChart)).observe(chartWrap); }catch{}
+}
+
+function pushChartPoint(v, ts){
+  if (chartData.length >= MAX_POINTS) { chartData.shift(); chartTime.shift(); }
+  chartData.push(v);
+  chartTime.push(ts || Date.now());
+}
+
+function niceDecimals(span){ return span >= 20 ? 0 : span >= 2 ? 1 : 2; }
+function hhmmss(ts){
+  const d = new Date(ts);
+  return [d.getHours(), d.getMinutes(), d.getSeconds()].map(x=>String(x).padStart(2,'0')).join(':');
+}
+
+function drawChart(){
+  const w = chartCanvas.clientWidth, h = chartCanvas.clientHeight;
+  if (!w || !h) return;
+  ctx.clearRect(0,0,w,h);
+
+  const n = chartData.length;
+  let min = 0, max = 1;
+  if (n){ min = Math.min(...chartData); max = Math.max(...chartData); }
+  if (max - min < 1e-6){ min -= 1; max += 1; }
+  else { const pad = (max-min)*0.06; min -= pad; max += pad; }
+  const span = max - min;
+
+  ctx.save();
+  ctx.font = '11px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif';
+  ctx.lineWidth = 1;
+  const ticks = 5, dec = niceDecimals(span);
+  const yLabels = Array.from({length:ticks+1}, (_,i)=>{ const v = min + span*i/ticks; return {v, text:`${v.toFixed(dec)} W`}; });
+  // why: ширина подписей зависит от значений (минус, тысячи) — отступ слева считаем по тексту
+  const labelW = Math.max(...yLabels.map(l=>ctx.measureText(l.text).width));
+  const PAD = {l:Math.ceil(labelW)+12, r:10, t:10, b:22};
+  const pw = Math.max(1, w-PAD.l-PAD.r), ph = Math.max(1, h-PAD.t-PAD.b);
+  const t1 = n ? chartTime[n-1] : Date.now();
+  const t0 = n ? chartTime[0] : t1 - 60000;
+  const dt = Math.max(1, t1 - t0);
+  const X = t => PAD.l + ((t - t0) / dt) * pw;
+  const Y = v => PAD.t + ph - ((v - min) / span) * ph;
+
+  // Y grid + labels
+  ctx.textBaseline = 'middle'; ctx.textAlign = 'right';
+  for (const {v, text} of yLabels){
+    const y = Math.round(Y(v)) + .5;
+    ctx.strokeStyle = 'rgba(218,218,218,.12)';
+    ctx.beginPath(); ctx.moveTo(PAD.l, y); ctx.lineTo(PAD.l+pw, y); ctx.stroke();
+    ctx.fillStyle = 'rgba(218,218,218,.8)';
+    ctx.fillText(text, PAD.l-6, y);
+  }
+  // Zero line
+  if (min < 0 && max > 0){
+    const y = Math.round(Y(0)) + .5;
+    ctx.strokeStyle = 'rgba(218,218,218,.45)'; ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.moveTo(PAD.l, y); ctx.lineTo(PAD.l+pw, y); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  // Axes
+  ctx.strokeStyle = 'rgba(218,218,218,.6)';
+  ctx.beginPath(); ctx.moveTo(PAD.l+.5, PAD.t); ctx.lineTo(PAD.l+.5, PAD.t+ph+.5); ctx.lineTo(PAD.l+pw, PAD.t+ph+.5); ctx.stroke();
+  // X labels
+  ctx.fillStyle = 'rgba(218,218,218,.8)'; ctx.textBaseline = 'alphabetic';
+  const xTicks = pw > 260 ? 3 : 2;
+  for (let i=0;i<=xTicks;i++){
+    ctx.textAlign = i===0 ? 'left' : i===xTicks ? 'right' : 'center';
+    ctx.fillText(hhmmss(t0 + dt*i/xTicks), PAD.l + pw*i/xTicks, h-6);
+  }
+
+  if (!n){
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = 'rgba(218,218,218,.5)';
+    ctx.fillText('Нет данных', PAD.l + pw/2, PAD.t + ph/2);
+  } else {
+    ctx.beginPath();
+    ctx.lineWidth = 1.5; ctx.lineJoin = 'round';
+    ctx.strokeStyle = '#ef3921';
+    for (let i=0;i<n;i++){
+      const x = n===1 ? PAD.l + pw : X(chartTime[i]), y = Y(chartData[i]);
+      if (i===0 || chartTime[i]-chartTime[i-1] > CHART_GAP_MS) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+    // last point marker
+    const lx = n===1 ? PAD.l + pw : X(chartTime[n-1]), ly = Y(chartData[n-1]);
+    ctx.fillStyle = '#ef3921'; ctx.beginPath(); ctx.arc(lx, ly, 2.5, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+/* ================= Render ================= */
+let renderQueued = false;
+function scheduleRender(){
+  if (renderQueued) return;
+  renderQueued = true;
+  // why: rAF не срабатывает во фоновой вкладке; setTimeout-фолбэк держит Raw/логгер в актуальном виде
+  const run = ()=>{ if (!renderQueued) return; renderQueued = false; render(); };
+  requestAnimationFrame(run);
+  setTimeout(run, 250);
+}
+function render(){
+  renderHud();
+  renderCells();
+  if (tabChart.classList.contains('active')) drawChart();
+  if (showRaw.checked) rawInfo.textContent = compileBatInfo();
+}
+
+function renderHud(){
+  const v=STATE.totalV, i=STATE.current, w=powerW();
+  hudPower.textContent = isNum(w) ? w.toFixed(Math.abs(w)>=100?0:1) : '—';
+  hudVolt.textContent  = isNum(v) ? v.toFixed(2) : '—';
+  hudAmp.textContent   = isNum(i) ? i.toFixed(2) : '—';
+  hudSoc.textContent   = isNum(STATE.soc) ? STATE.soc.toFixed(0) : '—';
+  hudCapRem.textContent= isNum(STATE.capRem) ? STATE.capRem.toFixed(2) : '—';
+
+  const eta = estimateEta();
+  hudEtaLabel.textContent = eta.mode==='discharge' ? 'До разряда' : eta.mode==='charge' ? 'До заряда' : 'Время';
+  hudEta.textContent = eta.mode==='idle' ? 'стоп'
+    : eta.mode==='charge' && !isNum(eta.hours) ? 'заряд'
+    : formatEtaHours(eta.hours);
+
+  const act = activeCells();
+  hudDelta.textContent = act.length > 1 ? ((Math.max(...act)-Math.min(...act))*1000).toFixed(0) : '—';
+
+  const bal = !!STATE.balancing;
+  hudBal.textContent = `Balancing: ${bal?'ON':'OFF'}`;
+  hudBal.className = 'pill' + (bal ? ' on':'');
+
+  const t = (x)=> isNum(x) ? `${x.toFixed(1)}°C` : '—';
+  let temps = `T1 ${t(STATE.temp1)} · T2 ${t(STATE.temp2)}`;
+  if (isNum(STATE.tmos)) temps += ` · MOS ${t(STATE.tmos)}`;
+  hudTemps.textContent = temps;
+  const hot = [STATE.temp1, STATE.temp2, STATE.tmos].some(x=>isNum(x) && (x>=55 || x<=0));
+  hudTemps.className = 'pill' + (hot ? ' warn' : '');
+
+  hudCycles.hidden = !isNum(STATE.cycles);
+  if (isNum(STATE.cycles)) hudCycles.textContent = `Циклы ${STATE.cycles}`;
+
+  const err = (STATE.errors||'').trim();
+  const bad = !!err && err.toUpperCase()!=='OK';
+  hudErrors.textContent = bad ? err : 'OK';
+  hudErrors.className = 'pill ' + (bad ? 'err':'ok');
+}
+
+/* ================= Raw info ================= */
+function compileBatInfo(){
+  const v=STATE.totalV, i=STATE.current, w=powerW();
+  const lines=[];
+  if (conn.device) lines.push(`Device: ${conn.device.name||conn.device.id}${conn.driver?` (${conn.driver.kind})`:''}${STATE.model?` · ${STATE.model}`:''}`);
+  lines.push(`Pack: ${fmt(v,'V',3)} ${fmt(i,'A',3)} ${fmt(w,'W',1)}`);
+  const meta=[];
+  if (isNum(STATE.soc)) meta.push(`SOC ${STATE.soc.toFixed(0)}%`);
+  meta.push(`Balancing ${STATE.balancing?'ON':'OFF'}`);
+  if (isNum(STATE.capRem)) meta.push(`${STATE.capRem.toFixed(2)} Ah`);
+  const eta = estimateEta();
+  if (eta.mode==='discharge') meta.push(`ETA ${formatEtaHours(eta.hours)}`);
+  else if (eta.mode==='charge') meta.push(`ETA ${isNum(eta.hours)?formatEtaHours(eta.hours):'charge'}`);
+  else if (eta.mode==='idle') meta.push('ETA stop');
+  const Cn = estimateFullCapacityAh();
+  if (isNum(Cn)) meta.push(`C${isNum(STATE.capFull)?'=':'≈'}${Cn.toFixed(1)}Ah`);
+  if (isNum(STATE.cycles)) meta.push(`Cycles ${STATE.cycles}`);
+  lines.push(meta.join(' · '));
+
+  if (isNum(STATE.temp1)||isNum(STATE.temp2)||isNum(STATE.tmos)) lines.push(`Temps: ${fmt(STATE.temp1,'°C',1)} ${fmt(STATE.temp2,'°C',1)} MOS ${fmt(STATE.tmos,'°C',1)}`);
+  if (STATE.errors && STATE.errors.toUpperCase()!=='OK') lines.push(`Errors: ${STATE.errors}`);
+
+  const act=activeCells();
+  if (act.length){
+    const sum=act.reduce((a,b)=>a+b,0), min=Math.min(...act), max=Math.max(...act);
+    const deltaMv=(max-min)*1000, diffMv=isNum(v)? (v-sum)*1000 : NaN;
+    const [minMv,maxMv]=getCellScaleMv();
+    lines.push(`Cells: ${act.length} · Σ=${fmt(sum,'V',3)} · Min/Max=${min.toFixed(3)}/${max.toFixed(3)} V · Δ=${deltaMv.toFixed(1)} mV`);
+    if (isNum(diffMv)) lines.push(`Pack − Σcells = ${diffMv.toFixed(1)} mV`);
+    lines.push(`Scale: ${(minMv/1000).toFixed(3)}–${(maxMv/1000).toFixed(3)} V`);
+  } else lines.push('Cells: –');
+  const now=Date.now();
+  lines.push(`Freshness: cells ${ago(STATE.lastCellsTs, now)}, pack ${ago(STATE.lastSummaryTs, now)}`);
+  lines.push(`Cloud log: ${logger.describe()}`);
+  return lines.join('\n');
+}
+
+/* ================= Switches ================= */
+function applyRawVisibility(){
+  rawInfo.hidden = !showRaw.checked;
+  if (showRaw.checked) rawInfo.textContent = compileBatInfo();
+}
+showRaw.addEventListener('change', applyRawVisibility);
+
+cloudLogChk.checked = storageGet(STORAGE_KEYS.cloudLog, '1') === '1';
+cloudLogChk.addEventListener('change', ()=>{
+  storageSet(STORAGE_KEYS.cloudLog, cloudLogChk.checked ? '1' : '0');
+  if (cloudLogChk.checked && conn.connected) logger.start(); else logger.stop();
+});
+
+/* Screen Wake Lock: BLE-соединение на телефоне часто рвётся, когда экран гаснет */
+let wakeLock = null;
+async function syncWakeLock(){
+  if (!('wakeLock' in navigator)) return;
+  try{
+    if (wakeLockChk.checked && document.visibilityState==='visible' && !wakeLock){
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', ()=>{ wakeLock = null; });
+    } else if (!wakeLockChk.checked && wakeLock){
+      await wakeLock.release(); wakeLock = null;
+    }
+  }catch(e){ console.warn('wakeLock', e); }
+}
+if ('wakeLock' in navigator){
+  $('#wakeLockSw').hidden = false;
+  wakeLockChk.checked = storageGet(STORAGE_KEYS.wakeLock, '0') === '1';
+  wakeLockChk.addEventListener('change', ()=>{ storageSet(STORAGE_KEYS.wakeLock, wakeLockChk.checked?'1':'0'); syncWakeLock(); });
+  document.addEventListener('visibilitychange', syncWakeLock);
+}
+
+/* ================= BLE write helpers ================= */
+async function writeChr(chr, frame){
+  const p = chr.properties || {};
+  const primary = p.writeWithoutResponse && chr.writeValueWithoutResponse ? 'wo'
+    : p.write && chr.writeValueWithResponse ? 'w' : 'legacy';
+  const call = kind => kind==='wo' ? chr.writeValueWithoutResponse(frame)
+    : kind==='w' ? chr.writeValueWithResponse(frame) : chr.writeValue(frame);
+  try{ await call(primary); }
+  catch(e){
+    const alt = primary==='wo' ? (chr.writeValueWithResponse ? 'w' : 'legacy') : (chr.writeValueWithoutResponse ? 'wo' : 'legacy');
+    if (alt === primary) throw e;
+    await call(alt);
+  }
+}
+/* Serialises writes: parallel GATT ops fail with "GATT operation already in progress". */
+function makeWriter(chr){
+  let chain = Promise.resolve();
+  return frame => {
+    const p = chain.then(()=>writeChr(chr, frame));
+    chain = p.catch(()=>{});
+    return p;
+  };
+}
+
+/* ================= JK protocol ================= */
+const JK_FRAME_SIZES = [300, 320, 352, 368, 384];
+function sumCrc(frame,len){ let c=0; for(let i=0;i<len;i++) c=(c+(frame[i]&0xFF))&0xFF; return c; }
+function jkIndexOfHeader(a, from=0){
+  for (let i=from;i<=a.length-4;i++) if (a[i]===0x55&&a[i+1]===0xAA&&a[i+2]===0xEB&&a[i+3]===0x90) return i;
+  return -1;
+}
+function jkBuildCmd(cmd,value=0,len=0){
+  const frame=new Uint8Array(20);
+  frame[0]=0xAA; frame[1]=0x55; frame[2]=0x90; frame[3]=0xEB; frame[4]=cmd; frame[5]=len;
+  frame[6]=value&0xFF; frame[7]=(value>>8)&0xFF; frame[8]=(value>>16)&0xFF; frame[9]=(value>>>24)&0xFF;
+  frame[19]=sumCrc(frame,19);
+  return frame;
+}
+/* Reassembles JK notifications (MTU-sized chunks) into CRC-checked frames. */
+function makeJkFramer(onFrame){
+  let buf = [];
+  return function push(chunk){
+    for (const b of chunk) buf.push(b);
+    for (;;){
+      const h = jkIndexOfHeader(buf);
+      if (h < 0){ buf = buf.slice(-3); return; }
+      if (h > 0) buf = buf.slice(h);
+      if (buf.length < JK_FRAME_SIZES[0]) return;
+      const next = jkIndexOfHeader(buf, 4);
+      const sizes = JK_FRAME_SIZES.slice();
+      if (next >= JK_FRAME_SIZES[0] && !sizes.includes(next)) sizes.push(next);
+      sizes.sort((a,b)=>a-b);
+      let matched = 0;
+      for (const size of sizes){
+        if (buf.length < size) break;
+        if (sumCrc(buf, size-1) === buf[size-1]){ matched = size; break; }
+      }
+      if (matched){
+        const frame = buf.slice(0, matched);
+        buf = buf.slice(matched);
+        try{ onFrame(frame); }catch(ex){ console.warn('JK parse', ex); }
+        continue;
+      }
+      // Corrupt / unknown-size frame: resync on the next header, or give up once too long.
+      if (next >= JK_FRAME_SIZES[0] || buf.length >= 512){ buf = buf.slice(next > 0 ? next : 4); continue; }
+      return;
+    }
+  };
+}
+const jk = {
+  u16(d,i){ return ((d[i+1]<<8)|d[i]) & 0xFFFF; },
+  s16(d,i){ const v=jk.u16(d,i); return (v&0x8000)? (v-0x10000): v; },
+  u32(d,i){ return ((jk.u16(d,i+2)<<16)|jk.u16(d,i))>>>0; },
+  s32(d,i){ const v=jk.u32(d,i); return (v&0x80000000)? (v-0x100000000): v; },
+};
+/* Parses one CRC-valid JK frame. Returns a partial STATE update or null. */
+function parseJkFrame(d){
+  const type=d[4];
+  if (type===0x01) return parseJkSettings(d);
+  if (type===0x02) return parseJk02(d,0) || parseJk02(d,32) || parseJk04(d);
+  if (type===0x03) return parseJkDeviceInfo(d);
+  return null;
+}
+function parseJkDeviceInfo(d){
+  const ascii = (a,b)=> String.fromCharCode(...d.slice(a,b)).replace(/[^\x20-\x7e]/g,'').trim();
+  const model = ascii(6,22), hw = ascii(22,30), sw = ascii(30,38);
+  const s = [model, hw && `HW ${hw}`, sw && `SW ${sw}`].filter(Boolean).join(' · ');
+  return s ? { model: s } : null;
+}
+function parseJkSettings(d){
+  const uvp = jk.u32(d,10), ovp = jk.u32(d,18);
+  const soc100 = jk.u32(d,30), soc0 = jk.u32(d,34);
+  const okU = uvp>1000 && uvp<5000;
+  const okO = ovp>2000 && ovp<5000;
+  const okS = soc100>soc0 && soc100<5000 && soc0>1000;
+  return {
+    cfgUvpMv: okU?uvp:NaN, cfgOvpMv: okO?ovp:NaN,
+    cfgSoc0mV: okS?soc0:NaN, cfgSoc100mV: okS?soc100:NaN,
+  };
+}
+/* JK02: off=0 → 24S layout, off=32 → 32S layout (JK02_32S, newer firmware). */
+function parseJk02(d,off){
+  const nCells = off ? 32 : 24;
+  if (d.length < 154+off) return null;
+  const cells=[];
+  for (let i=0;i<nCells;i++) cells.push(jk.u16(d,6+i*2)*0.001);
+  const act = cells.filter(v=>v>0);
+  if (!act.length || act.some(v=>v<0.5 || v>5)) return null;
+
+  const totalV = jk.u32(d,118+off) * 0.001;
+  const sum = act.reduce((a,b)=>a+b,0);
+  // why: проверяем, что напряжение пакета согласуется с суммой ячеек — отсекает неверную раскладку
+  if (!(totalV >= 1.5*act.length && totalV <= 5.0*act.length)) return null;
+  if (Math.abs(totalV - sum) > Math.max(0.5, sum*0.1)) return null;
+
+  const current = jk.s32(d,126+off) * 0.001;
+  const temp1 = jk.s16(d,130+off)*0.1, temp2 = jk.s16(d,132+off)*0.1;
+  const tmos = off ? jk.s16(d,112+off)*0.1 : jk.s16(d,134+off)*0.1;
+  const errPos = off ? 134+off : 136+off;
+  const errMask = (d[errPos]<<8) | d[errPos+1];
+  const soc = d[141+off];
+  return {
+    cells, totalV, current, temp1, temp2,
+    tmos: (tmos > -40 && tmos < 150) ? tmos : NaN,
+    balancing: d[140+off] !== 0x00,
+    soc: soc <= 100 ? soc : NaN,
+    capRem: jk.u32(d,142+off)*0.001,
+    capFull: jk.u32(d,146+off)*0.001 || NaN,
+    cycles: jk.u32(d,150+off),
+    errors: jkErrors(errMask),
+  };
+}
+/* JK04 (old BMS): float32 cell voltages, no pack data */
+function parseJk04(d){
+  const cells=[];
+  const dv = new DataView(new Uint8Array(d).buffer);
+  for (let i=0;i<24;i++){ const pos=6+i*4; if (pos+4>d.length) break; cells.push(dv.getFloat32(pos,true)); }
+  const act = cells.filter(v=>isNum(v) && v>0);
+  if (!act.length || cells.some(v=>!isNum(v) || v<0 || v>5) || act.some(v=>v<0.5)) return null;
+  return { cells, totalV: act.reduce((a,b)=>a+b,0) };
+}
+function jkErrors(mask){
+  if (!(mask>0)) return 'OK';
+  const names=['Charge Overtemp','Charge Undertemp','Coprocessor comm','Cell Undervoltage','Pack Undervoltage','Discharge Overcurrent','Discharge Short','Discharge Overtemp','Wire Resistance','MOSFET Overtemp','Cell Count Mismatch','Current Sensor Anomaly','Cell Overvoltage','Pack Overvoltage','Charge Overcurrent','Charge Short'];
+  const list=[]; for(let i=0;i<names.length;i++) if(mask&(1<<i)) list.push(names[i]);
+  return list.join('; ');
+}
+
+async function makeJk(server, onData){
+  const svc = await server.getPrimaryService(UUID.JK_SVC);
+  const chr = await svc.getCharacteristic(UUID.JK_CHR);
+  const write = makeWriter(chr);
+  let lastRx = Date.now();
+  let watchdog = null;
+  const framer = makeJkFramer(frame=>{
+    const p = parseJkFrame(frame);
+    if (p){ lastRx = Date.now(); onData(p); }
+  });
+  function onNotify(ev){
+    const view = ev.target.value;
+    framer(new Uint8Array(view.buffer, view.byteOffset, view.byteLength));
+  }
+  async function start(){
+    chr.addEventListener('characteristicvaluechanged', onNotify);
+    await chr.startNotifications();
+    await sleep(120);
+    await write(jkBuildCmd(0x97)); // device info
+    await write(jkBuildCmd(0x96)); // settings + cell info stream
+    lastRx = Date.now();
+    watchdog = setInterval(()=>{
+      if (server.connected && Date.now()-lastRx>3000) write(jkBuildCmd(0x96)).catch(()=>{});
+    }, 1000);
+  }
+  async function stop(){
+    if (watchdog){ clearInterval(watchdog); watchdog = null; }
+    chr.removeEventListener('characteristicvaluechanged', onNotify);
+    if (server.connected){ try{ await chr.stopNotifications(); }catch{} }
+  }
+  return { kind:'JK', start, stop };
+}
+
+/* ================= JBD protocol ================= */
+function jbdChecksum(data,offset,len){ let sum=0; for(let i=0;i<len;i++) sum=(sum - (data[offset+i]&0xFF))&0xFFFF; return sum; }
+function jbdBuildRead(reg){
+  const frame = new Uint8Array(7);
+  frame[0]=0xDD; frame[1]=0xA5; frame[2]=reg; frame[3]=0x00;
+  const crc = jbdChecksum(frame,2,2);
+  frame[4]=(crc>>8)&0xFF; frame[5]=crc&0xFF; frame[6]=0x77;
+  return frame;
+}
+/* Frame: DD cmd status len data… crcHi crcLo 77 */
+function makeJbdFramer(onFrame){
+  let buf = [];
+  return function push(chunk){
+    for (const b of chunk) buf.push(b);
+    for (;;){
+      const s = buf.indexOf(0xDD);
+      if (s < 0){ buf = []; return; }
+      if (s > 0) buf = buf.slice(s);
+      if (buf.length < 7) return;
+      const dataLen = buf[3];
+      const frameLen = 4 + dataLen + 3;
+      if (buf.length < frameLen) return;
+      if (buf[frameLen-1] !== 0x77){ buf = buf.slice(1); continue; }
+      const crcRemote = ((buf[frameLen-3] << 8) | buf[frameLen-2]) & 0xFFFF;
+      const crcLocal = jbdChecksum(buf, 2, 2 + dataLen);
+      if (crcLocal !== crcRemote){ buf = buf.slice(1); continue; }
+      const frame = buf.slice(0, frameLen);
+      buf = buf.slice(frameLen);
+      try{ onFrame(frame); }catch(ex){ console.warn('JBD parse', ex); }
+    }
+  };
+}
+const jbd = {
+  u16(d,i){ return ((d[i]<<8)|d[i+1])&0xFFFF; },
+  s16(d,i){ const v=jbd.u16(d,i); return (v&0x8000) ? v-0x10000 : v; },
+  u32(d,i){ return ((jbd.u16(d,i)<<16)|jbd.u16(d,i+2))>>>0; },
+};
+function parseJbdFrame(frame){
+  const fn = frame[1], status = frame[2], len = frame[3];
+  if (status !== 0x00) return null;
+  const data = frame.slice(4, 4 + len);
+  if (fn === 0x03) return parseJbdHwInfo(data);
+  if (fn === 0x04) return parseJbdCells(data);
+  if (fn === 0x05) return parseJbdVersion(data);
+  return null;
+}
+function parseJbdHwInfo(d){
+  if (d.length < 23) return null;
+  const tempCnt = Math.min(d[22], 6, Math.floor((d.length-23)/2));
+  const temps=[]; for(let i=0;i<tempCnt;i++) temps.push((jbd.u16(d,23+i*2)-2731)*0.1);
+  const errMask = jbd.u16(d,16);
+  return {
+    totalV: jbd.u16(d,0)*0.01,
+    current: jbd.s16(d,2)*0.01,
+    capRem: jbd.u16(d,4)*0.01,
+    capFull: jbd.u16(d,6)*0.01 || NaN,
+    cycles: jbd.u16(d,8),
+    balancing: jbd.u32(d,12) !== 0,
+    errors: jbdErrors(errMask),
+    soc: d[19],
+    temp1: temps[0] ?? NaN, temp2: temps[1] ?? NaN, tmos: temps[2] ?? NaN,
+  };
+}
+function parseJbdCells(d){
+  if (d.length<2 || d.length>64 || (d.length%2)!==0) return null;
+  const cells=[]; for(let i=0;i<d.length/2;i++) cells.push(jbd.u16(d,i*2)*0.001);
+  return { cells };
+}
+function parseJbdVersion(d){
+  const s = String.fromCharCode(...d).replace(/[^\x20-\x7e]/g,'').trim();
+  return s ? { model: s } : null;
+}
+function jbdErrors(mask){
+  if (!mask) return 'OK';
+  const names=['Cell overvoltage','Cell undervoltage','Pack overvoltage','Pack undervoltage','Charging over temperature','Charging under temperature','Discharging over temperature','Discharging under temperature','Charging overcurrent','Discharging overcurrent','Short circuit','IC front-end error','Mosfet Software Lock','Charge timeout Close','Unknown(0x0E)','Unknown(0x0F)'];
+  const out=[]; for(let i=0;i<names.length;i++) if(mask&(1<<i)) out.push(names[i]);
+  return out.join('; ');
+}
+
+async function makeJbd(server, onData){
+  const svc = await server.getPrimaryService(UUID.JBD_SVC);
+  const chrN = await svc.getCharacteristic(UUID.JBD_NOTIFY);
+  const chrC = await svc.getCharacteristic(UUID.JBD_CTRL);
+  const write = makeWriter(chrC);
+  let poll = null, tick = 0;
+  const framer = makeJbdFramer(frame=>{ const p = parseJbdFrame(frame); if (p) onData(p); });
+  function onNotify(ev){
+    const view = ev.target.value;
+    framer(new Uint8Array(view.buffer, view.byteOffset, view.byteLength));
+  }
+  async function start(){
+    chrN.addEventListener('characteristicvaluechanged', onNotify);
+    await chrN.startNotifications();
+    await write(jbdBuildRead(0x05)).catch(()=>{});
+    await write(jbdBuildRead(0x03));
+    await write(jbdBuildRead(0x04));
+    // why: один таймер с чередованием 0x03/0x04 — запросы не наслаиваются
+    poll = setInterval(()=>{
+      if (!server.connected) return;
+      write(jbdBuildRead(tick++ % 2 ? 0x04 : 0x03)).catch(()=>{});
+    }, 1000);
+  }
+  async function stop(){
+    if (poll){ clearInterval(poll); poll = null; }
+    chrN.removeEventListener('characteristicvaluechanged', onNotify);
+    if (server.connected){ try{ await chrN.stopNotifications(); }catch{} }
+  }
+  return { kind:'JBD', start, stop };
+}
+
+/* ================= Connection manager ================= */
+const conn = { device:null, driver:null, connected:false, userDisconnect:false, reconnectTimer:null, attempts:0 };
+let busy = false;
+
+async function createDriver(server){
+  const hasJBD = await server.getPrimaryService(UUID.JBD_SVC).then(()=>true,()=>false);
+  if (hasJBD) return makeJbd(server, applyUpdate);
+  const hasJK = await server.getPrimaryService(UUID.JK_SVC).then(()=>true,()=>false);
+  if (hasJK) return makeJk(server, applyUpdate);
+  throw new Error('Поддерживаемые сервисы не найдены');
+}
+
+/* Remembered devices may need an advertisement before gatt.connect() succeeds. */
+async function waitForAdvertisement(device, ms){
+  if (typeof device.watchAdvertisements !== 'function') return;
+  const ac = new AbortController();
+  try{
+    await withTimeout(new Promise((resolve, reject)=>{
+      device.addEventListener('advertisementreceived', resolve, {once:true});
+      device.watchAdvertisements({signal: ac.signal}).catch(reject);
+    }), ms, 'no advertisement');
+  }catch{ /* best effort */ }
+  finally{ ac.abort(); }
+}
+
+function onGattDisconnected(ev){
+  if (ev.target !== conn.device) return;
+  const wasConnected = conn.connected;
+  const d = conn.driver;
+  conn.driver = null; conn.connected = false;
+  if (d) d.stop().catch(()=>{});
+  logger.stop();
+  setBtState('idle');
+  if (!wasConnected) return;
+  if (conn.userDisconnect){ setStatus('Disconnected'); return; }
+  conn.attempts = 0;
+  scheduleReconnect();
+}
+
+function cancelReconnect(){
+  if (conn.reconnectTimer){ clearTimeout(conn.reconnectTimer); conn.reconnectTimer = null; }
+}
+function scheduleReconnect(){
+  cancelReconnect();
+  if (!conn.device || conn.userDisconnect) return;
+  if (conn.attempts >= RECONNECT_MAX_ATTEMPTS){ setStatus('Disconnected (нет связи)'); return; }
+  const delay = Math.min(30000, 1000 * 2 ** conn.attempts);
+  conn.attempts++;
+  setStatus(`Связь потеряна — повтор через ${Math.round(delay/1000)} с (${conn.attempts}/${RECONNECT_MAX_ATTEMPTS})`);
+  conn.reconnectTimer = setTimeout(async ()=>{
+    conn.reconnectTimer = null;
+    try{ await connect(conn.device, {advertise:true, quiet:true}); }
+    catch{ scheduleReconnect(); }
+  }, delay);
+}
+
+async function teardown(){
+  const d = conn.driver;
+  conn.driver = null; conn.connected = false;
+  logger.stop();
+  if (d){ try{ await d.stop(); }catch{} }
+  try{ if (conn.device?.gatt?.connected) conn.device.gatt.disconnect(); }catch{}
+}
+
+async function connect(device, opts={}){
+  if (busy) return false;
+  busy = true;
+  cancelReconnect();
+  const name = device.name || device.id;
+  try{
+    if (conn.device && conn.device !== device){ // switching to another BMS: drop the old link and its data
+      conn.userDisconnect = true;
+      await teardown();
+      conn.device.removeEventListener('gattserverdisconnected', onGattDisconnected);
+      resetState(); chartData.length = 0; chartTime.length = 0; scheduleRender();
+    }
+    conn.device = device;
+    conn.userDisconnect = false;
+    device.removeEventListener('gattserverdisconnected', onGattDisconnected);
+    device.addEventListener('gattserverdisconnected', onGattDisconnected);
+    setBtState('connecting');
+    setStatus(`Подключение к ${name}…`);
+    if (opts.advertise) await waitForAdvertisement(device, 8000);
+    const server = await withTimeout(device.gatt.connect(), CONNECT_TIMEOUT_MS, 'Таймаут подключения');
+    const driver = await createDriver(server);
+    conn.driver = driver;
+    await driver.start();
+    conn.connected = true;
+    conn.attempts = 0;
+    storageSet(STORAGE_KEYS.lastDeviceId, device.id || '');
+    setStatus(`Connected · ${name} (${driver.kind})`);
+    setBtState('connected');
+    if (cloudLogChk.checked) logger.start();
+    return true;
+  }catch(err){
+    console.error(err);
+    const d = conn.driver; conn.driver = null; conn.connected = false;
+    if (d){ try{ await d.stop(); }catch{} }
+    try{ device.gatt.disconnect(); }catch{}
+    setBtState('idle');
+    if (!opts.quiet) setStatus(`Ошибка: ${errMsg(err)}`);
+    throw err;
+  }finally{ busy = false; }
+}
+
+async function disconnect(){
+  conn.userDisconnect = true;
+  cancelReconnect();
+  await teardown();
+  setBtState('idle');
+  setStatus('Disconnected');
+}
+
+/* ================= BT button + picker ================= */
+const dlg = $('#dlg-picker');
+const btnChoose = $('#btn-choose');
+const btnReconnect = $('#btn-reconnect');
+const btnClosePicker = $('#btn-close-picker');
+const recentList = $('#recent-list');
+const pickerStatus = $('#picker-status');
+
+function openPicker(msg){
+  pickerStatus.textContent = msg || '';
+  recentList.hidden = true;
+  if (!dlg.open) dlg.showModal();
+}
+
+btnBtEl.addEventListener('click', async ()=>{
+  if (busy) return;
+  if (conn.connected){
+    busy = true; setBtState('connecting');
+    try{ await disconnect(); } finally{ busy = false; }
+    return;
+  }
+  if (conn.reconnectTimer){ conn.userDisconnect = true; cancelReconnect(); setStatus('Idle'); }
+  openPicker();
+});
+btnClosePicker.addEventListener('click', ()=> dlg.close());
+
+async function connectFromPicker(device, advertise){
+  pickerStatus.textContent = `Подключение к ${device.name||device.id}…`;
+  try{
+    await connect(device, {advertise});
+    dlg.close();
+  }catch(err){
+    pickerStatus.textContent = 'Не удалось подключиться: ' + errMsg(err);
+  }
+}
+
+btnReconnect.addEventListener('click', async ()=>{
+  if (!('bluetooth' in navigator) || typeof navigator.bluetooth.getDevices !== 'function'){
+    pickerStatus.textContent = 'Браузер не поддерживает быстрый доступ к недавним.'; return;
+  }
+  let list = [];
+  try{ list = await navigator.bluetooth.getDevices(); }
+  catch(err){ pickerStatus.textContent = 'Ошибка: ' + errMsg(err); return; }
+  recentList.replaceChildren();
+  recentList.hidden = false;
+  if (!list.length){ recentList.textContent = 'Недавних устройств нет'; return; }
+  for (const dev of list){
+    // why: имя BLE-устройства задаёт кто угодно поблизости — только textContent, без innerHTML
+    const item = document.createElement('div'); item.className = 'recent-item';
+    const info = document.createElement('div');
+    info.append(document.createTextNode((dev.name || '(unnamed)') + ' '));
+    const id = document.createElement('span'); id.className = 'id'; id.textContent = dev.id;
+    info.append(id);
+    const btn = document.createElement('button'); btn.className = 'dlg-btn'; btn.textContent = 'Подключить';
+    btn.addEventListener('click', ()=> connectFromPicker(dev, true));
+    item.append(info, btn);
+    recentList.appendChild(item);
+  }
+});
+
+btnChoose.addEventListener('click', async ()=>{
+  let device;
+  try{
+    pickerStatus.textContent = 'Открытие системного выбора…';
+    device = await navigator.bluetooth.requestDevice({
+      filters:[{services:[UUID.JK_SVC]},{services:[UUID.JBD_SVC]}],
+      optionalServices:[UUID.JK_SVC,UUID.JBD_SVC]
+    });
+  }catch(err){
+    pickerStatus.textContent = err?.name==='NotFoundError' ? 'Отменено'
+      : err?.name==='SecurityError' ? 'Требуется клик по кнопке «Выбрать устройство…»'
+      : 'Ошибка: ' + errMsg(err);
+    return;
+  }
+  await connectFromPicker(device, false);
+});
+
+/* ================= Auto-connect ================= */
+async function autoConnectOnLoad(){
+  if (!('bluetooth' in navigator)) return;
+  let available = true;
+  try{ if (typeof navigator.bluetooth.getAvailability === 'function') available = await navigator.bluetooth.getAvailability(); }catch{}
+  if (!available){ setStatus('Bluetooth недоступен (адаптер выключен?)'); return; }
+  if (typeof navigator.bluetooth.getDevices === 'function'){
+    try{
+      const granted = await navigator.bluetooth.getDevices();
+      const lastId = storageGet(STORAGE_KEYS.lastDeviceId, '');
+      const dev = (lastId && granted.find(d=>d.id===lastId)) || granted[0];
+      if (dev){
+        try{ await connect(dev, {advertise:true}); return; }
+        catch(err){ openPicker(`Автоподключение к ${dev.name||dev.id} не удалось: ${errMsg(err)}`); return; }
+      }
+    }catch(e){ console.warn('autoConnectOnLoad (granted) failed:', e); }
+  }
+  openPicker('Нажмите «Выбрать устройство…» (браузеру нужен пользовательский жест).');
+}
+
+/* ================= Cloud logger ================= */
+const logger = (()=>{
+  let timer = null, inFlight = false, lastSentAt = 0, lastHash = '';
+  let failCount = 0, nextTryAt = 0, sentCount = 0, lastError = '';
+
+  function collectSample(){
+    if (!isNum(STATE.totalV) && !activeCells().length) return null; // ещё нет данных
+    const cells = activeCells().slice(0, MAX_CELLS);
+    const sum = cells.reduce((a, b) => a + b, 0);
+    const diffMv = (isNum(STATE.totalV) && cells.length) ? Math.round((STATE.totalV - sum) * 1000) : null;
+    const [minMv, maxMv] = getCellScaleMv();
+    const v = isNum(STATE.totalV) ? STATE.totalV : null;
+    const i = isNum(STATE.current) ? STATE.current : null;
+    const power = (v != null && i != null) ? v * i : null;
+    return {
+      deviceName: (conn.device?.name || 'Battery').toString(),
+      timestamp: new Date().toISOString(),
+      totalV: v, current: i, soc: isNum(STATE.soc) ? STATE.soc : null,
+      capRem: isNum(STATE.capRem) ? STATE.capRem : null,
+      temp1: isNum(STATE.temp1) ? STATE.temp1 : null,
+      temp2: isNum(STATE.temp2) ? STATE.temp2 : null,
+      tmos: isNum(STATE.tmos) ? STATE.tmos : null,
+      balancing: !!STATE.balancing,
+      errors: (STATE.errors || '').trim() || null,
+      powerW: isNum(power) ? power : null,
+      scaleMinMv: isNum(minMv) ? minMv : null,
+      scaleMaxMv: isNum(maxMv) ? maxMv : null,
+      packSumDiffMv: isNum(diffMv) ? diffMv : null,
+      cells: cells.length ? cells : null,
+      pageUrl: location.href,
+      source: 'web-bt'
+    };
+  }
+  function post(sample){
+    return fetch(`${API_BASE}/api/batteries/samples`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(sample),
+      keepalive: true,
+      mode: 'cors'
+    }).then(res=>{ if (!res.ok) throw new Error(`HTTP ${res.status}`); });
+  }
+  async function trySend(){
+    if (inFlight || Date.now() < nextTryAt) return;
+    const s = collectSample();
+    if (!s) return;
+    const fingerprint = JSON.stringify([s.totalV, s.current, s.soc, s.powerW, s.cells]);
+    const stale = (Date.now() - lastSentAt) > 10_000;
+    if (!stale && fingerprint === lastHash) return;
+    inFlight = true;
+    try{
+      await post(s);
+      lastHash = fingerprint; lastSentAt = Date.now();
+      failCount = 0; nextTryAt = 0; sentCount++; lastError = '';
+    }catch(e){
+      failCount++;
+      lastError = errMsg(e);
+      nextTryAt = Date.now() + Math.min(60_000, 1000 * 2 ** failCount); // backoff, чтобы не спамить упавший сервер
+      if (failCount <= 3) console.warn('log send failed', e);
+    }finally{ inFlight = false; }
+  }
+  function flush(){
+    if (document.visibilityState !== 'hidden' || inFlight) return;
+    const s = collectSample();
+    if (s) post(s).catch(()=>{});
+  }
+  return {
+    start(){
+      if (timer) return;
+      timer = setInterval(trySend, 1000);
+      document.addEventListener('visibilitychange', flush);
+    },
+    stop(){
+      if (timer){ clearInterval(timer); timer = null; }
+      document.removeEventListener('visibilitychange', flush);
+    },
+    describe(){
+      if (!timer) return cloudLogChk.checked ? 'idle' : 'off';
+      return lastError ? `error (${lastError}), sent ${sentCount}` : `on, sent ${sentCount}`;
+    },
+  };
+})();
+
+/* ================= Init ================= */
+setStatus('Idle');
+setTab(storageGet(STORAGE_KEYS.tab, 'cells'));
+render();
+requestAnimationFrame(resizeChart);
+// Freshness / stale indicator
+setInterval(()=>{
+  const stale = conn.connected && STATE.lastSummaryTs && (Date.now() - STATE.lastSummaryTs > STALE_AFTER_MS);
+  metricsCard.classList.toggle('stale', !!stale || (!conn.connected && !!STATE.lastSummaryTs));
+  if (showRaw.checked) rawInfo.textContent = compileBatInfo();
+}, 1000);
+
+if (!('bluetooth' in navigator)){
+  btnBtEl.setAttribute('disabled','');
+  setStatus(window.isSecureContext ? 'Web Bluetooth не поддерживается в этом браузере (нужен Chrome / Edge)' : 'Web Bluetooth требует HTTPS');
+} else {
+  window.addEventListener('load', ()=>{ autoConnectOnLoad().catch(()=>{}); });
+}
+</script>
+</body>
+</html>
