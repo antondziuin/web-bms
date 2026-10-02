@@ -107,7 +107,7 @@
     #powerVal{font-size:44px;font-weight:800;line-height:1.05;letter-spacing:-1px}
     .power .unit{font-size:16px;font-weight:700;color:var(--muted)}
     .eta{font-size:13px;color:var(--muted)}
-    .eta b{color:var(--text);font-weight:700}
+    .eta b{color:var(--text);font-weight:700;white-space:nowrap}
 
     /* ---------- Metric tiles ---------- */
     .metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
@@ -178,6 +178,8 @@
     .kv dt:nth-last-of-type(1),.kv dd:last-of-type{border-bottom:0}
     .setting{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid var(--border);border-radius:12px;cursor:pointer}
     .setting-sub{font-size:12px;color:var(--muted)}
+    .settings{display:flex;flex-direction:column;gap:8px}
+    .select{font:inherit;color:var(--text);background:var(--surface-2);border:1px solid var(--border);border-radius:9px;height:32px;padding:0 8px;max-width:60%;cursor:pointer}
     .switch{appearance:none;-webkit-appearance:none;width:42px;height:24px;border-radius:999px;background:var(--border-strong);position:relative;cursor:pointer;flex:none;margin:0;transition:background .2s}
     .switch::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3);transition:transform .2s}
     .switch:checked{background:var(--accent)}
@@ -220,23 +222,23 @@
         <img class="brand-logo" src="icon.svg" alt="" />
         <div class="brand-text">
           <div class="brand-title">Battery monitor</div>
-          <div class="conn" id="connChip" data-tone="idle"><span class="dot"></span><span id="statusBar" role="status" aria-live="polite">Не подключено</span></div>
+          <div class="conn" id="connChip" data-tone="idle"><span class="dot"></span><span id="statusBar" role="status" aria-live="polite" data-i18n="status.idle">Не подключено</span></div>
         </div>
       </div>
-      <button id="btn-bt" class="btn btn-primary" title="Bluetooth: подключить / отключить"><svg><use href="#i-bt"/></svg><span id="btnBtLabel">Подключить</span></button>
+      <button id="btn-bt" class="btn btn-primary" title="Bluetooth: подключить / отключить" data-i18n-title="btn.btTitle"><svg><use href="#i-bt"/></svg><span id="btnBtLabel">Подключить</span></button>
     </header>
 
     <main class="layout">
       <section class="col col-left">
         <div class="card hero" id="metricsCard">
-          <div class="gauge" id="socGauge" data-level="none" role="img" aria-label="Уровень заряда">
+          <div class="gauge" id="socGauge" data-level="none" role="img" aria-label="Уровень заряда" data-i18n-aria="gauge.ariaUnknown">
             <svg viewBox="0 0 124 124">
               <circle class="track" cx="62" cy="62" r="54" fill="none" stroke-width="10"/>
               <circle class="arc" id="socArc" cx="62" cy="62" r="54" fill="none" stroke-width="10" stroke-linecap="round" stroke-dasharray="339.29" stroke-dashoffset="339.29"/>
             </svg>
             <div class="gauge-center">
               <div class="gauge-val num"><span id="socVal">—</span><small>%</small></div>
-              <div class="gauge-label">заряд</div>
+              <div class="gauge-label" data-i18n="gauge.label">заряд</div>
             </div>
           </div>
           <div class="hero-main">
@@ -248,30 +250,30 @@
 
         <div class="metrics">
           <div class="tile">
-            <div class="tile-label">Напряжение</div>
+            <div class="tile-label" data-i18n="tile.voltage">Напряжение</div>
             <div class="tile-value num"><span id="voltVal">—</span><span class="unit">V</span></div>
           </div>
           <div class="tile">
-            <div class="tile-label">Ток</div>
+            <div class="tile-label" data-i18n="tile.current">Ток</div>
             <div class="tile-value num"><span id="ampVal">—</span><span class="unit">A</span></div>
           </div>
           <div class="tile">
-            <div class="tile-label">Остаток</div>
+            <div class="tile-label" data-i18n="tile.remaining">Остаток</div>
             <div class="tile-value num"><span id="capRemVal">—</span><span class="unit">Ah</span></div>
             <div class="tile-sub num" id="capFullSub">&nbsp;</div>
           </div>
           <div class="tile" id="deltaTile">
-            <div class="tile-label">Разбаланс ячеек</div>
+            <div class="tile-label" data-i18n="tile.imbalance">Разбаланс ячеек</div>
             <div class="tile-value num"><span id="deltaVal">—</span><span class="unit">mV</span></div>
             <div class="tile-sub num" id="deltaSub">&nbsp;</div>
           </div>
           <div class="tile" id="tempTile">
-            <div class="tile-label">Температура <span style="opacity:.7">(макс.)</span></div>
+            <div class="tile-label"><span data-i18n="tile.temp">Температура</span> <span style="opacity:.7" data-i18n="tile.tempMax">(макс.)</span></div>
             <div class="tile-value num"><span id="tempsVal">—</span><span class="unit">°C</span></div>
             <div class="tile-sub num" id="tempsSub">&nbsp;</div>
           </div>
           <div class="tile">
-            <div class="tile-label">Циклы</div>
+            <div class="tile-label" data-i18n="tile.cycles">Циклы</div>
             <div class="tile-value num"><span id="cyclesVal">—</span></div>
             <div class="tile-sub num" id="cyclesSub">&nbsp;</div>
           </div>
@@ -286,59 +288,68 @@
       <section class="col col-right">
         <div class="card panel-card">
           <div class="seg" role="tablist">
-            <button id="tab-cells-btn" class="active" role="tab" aria-controls="tab-cells" aria-selected="true" data-tab="cells">Ячейки</button>
-            <button id="tab-chart-btn" role="tab" aria-controls="tab-chart" aria-selected="false" data-tab="chart">График</button>
-            <button id="tab-details-btn" role="tab" aria-controls="tab-details" aria-selected="false" data-tab="details">Детали</button>
+            <button id="tab-cells-btn" class="active" role="tab" aria-controls="tab-cells" aria-selected="true" data-tab="cells" data-i18n="tab.cells">Ячейки</button>
+            <button id="tab-chart-btn" role="tab" aria-controls="tab-chart" aria-selected="false" data-tab="chart" data-i18n="tab.chart">График</button>
+            <button id="tab-details-btn" role="tab" aria-controls="tab-details" aria-selected="false" data-tab="details" data-i18n="tab.details">Детали</button>
           </div>
 
           <div id="tab-cells" class="panel active" role="tabpanel" aria-labelledby="tab-cells-btn">
             <div class="empty" id="cellsEmpty">
               <svg><use href="#i-battery"/></svg>
-              <div class="empty-title">Нет данных по ячейкам</div>
-              <div>Подключитесь к BMS JK или JBD по Bluetooth.</div>
-              <button class="btn btn-primary btn-sm" id="cellsConnect"><svg><use href="#i-bt"/></svg>Подключить</button>
+              <div class="empty-title" data-i18n="cells.emptyTitle">Нет данных по ячейкам</div>
+              <div data-i18n="cells.emptyText">Подключитесь к BMS JK или JBD по Bluetooth.</div>
+              <button class="btn btn-primary btn-sm" id="cellsConnect"><svg><use href="#i-bt"/></svg><span data-i18n="btn.connect">Подключить</span></button>
             </div>
             <div class="cells-summary" id="cellsSummary" hidden>
-              <div class="stat"><div class="stat-label">Мин</div><div class="stat-val num" id="cellMin">—</div></div>
-              <div class="stat"><div class="stat-label">Сред</div><div class="stat-val num" id="cellAvg">—</div></div>
-              <div class="stat"><div class="stat-label">Макс</div><div class="stat-val num" id="cellMax">—</div></div>
-              <div class="stat"><div class="stat-label">Σ ячеек</div><div class="stat-val num" id="cellSum">—</div></div>
+              <div class="stat"><div class="stat-label" data-i18n="cells.min">Мин</div><div class="stat-val num" id="cellMin">—</div></div>
+              <div class="stat"><div class="stat-label" data-i18n="cells.avg">Сред</div><div class="stat-val num" id="cellAvg">—</div></div>
+              <div class="stat"><div class="stat-label" data-i18n="cells.max">Макс</div><div class="stat-val num" id="cellMax">—</div></div>
+              <div class="stat"><div class="stat-label" data-i18n="cells.sum">Σ ячеек</div><div class="stat-val num" id="cellSum">—</div></div>
             </div>
-            <div id="cellsSimple" aria-label="Поклеточные напряжения"></div>
+            <div id="cellsSimple" aria-label="Поклеточные напряжения" data-i18n-aria="cells.aria"></div>
           </div>
 
           <div id="tab-chart" class="panel" role="tabpanel" aria-labelledby="tab-chart-btn">
             <div class="chart-head">
-              <div class="seg seg-sm" id="chartMetric" role="group" aria-label="Показатель графика">
-                <button data-metric="w" aria-pressed="true">Мощность</button>
-                <button data-metric="i" aria-pressed="false">Ток</button>
-                <button data-metric="v" aria-pressed="false">Напряжение</button>
+              <div class="seg seg-sm" id="chartMetric" role="group" aria-label="Показатель графика" data-i18n-aria="chart.metricAria">
+                <button data-metric="w" aria-pressed="true" data-i18n="metric.w">Мощность</button>
+                <button data-metric="i" aria-pressed="false" data-i18n="metric.i">Ток</button>
+                <button data-metric="v" aria-pressed="false" data-i18n="metric.v">Напряжение</button>
                 <button data-metric="soc" aria-pressed="false">SOC</button>
               </div>
               <div class="chart-now" id="chartNow"></div>
             </div>
-            <div id="chartWrap"><canvas id="chart" aria-label="График"></canvas></div>
+            <div id="chartWrap"><canvas id="chart" aria-label="График" data-i18n-aria="chart.aria"></canvas></div>
           </div>
 
           <div id="tab-details" class="panel" role="tabpanel" aria-labelledby="tab-details-btn">
-            <div class="section-title">Устройство</div>
+            <div class="section-title" data-i18n="det.device">Устройство</div>
             <dl class="kv">
-              <dt>Имя</dt><dd id="detName">—</dd>
-              <dt>Протокол</dt><dd id="detKind">—</dd>
-              <dt>Модель</dt><dd id="detModel">—</dd>
-              <dt>Ёмкость</dt><dd id="detCap" class="num">—</dd>
-              <dt>Данные</dt><dd id="detFresh" class="num">—</dd>
+              <dt data-i18n="det.name">Имя</dt><dd id="detName">—</dd>
+              <dt data-i18n="det.protocol">Протокол</dt><dd id="detKind">—</dd>
+              <dt data-i18n="det.model">Модель</dt><dd id="detModel">—</dd>
+              <dt data-i18n="det.capacity">Ёмкость</dt><dd id="detCap" class="num">—</dd>
+              <dt data-i18n="det.data">Данные</dt><dd id="detFresh" class="num">—</dd>
             </dl>
-            <div id="settingsBlock" hidden>
-              <div class="section-title" style="margin-bottom:10px">Настройки</div>
-              <label class="setting" id="wakeLockSw">
-                <div><div>Не гасить экран</div><div class="setting-sub">На телефоне BLE часто рвётся, когда экран выключается</div></div>
+            <div id="settingsBlock" class="settings">
+              <div class="section-title" data-i18n="det.settings">Настройки</div>
+              <label class="setting">
+                <div data-i18n="det.language">Язык</div>
+                <select id="langSelect" class="select">
+                  <option value="auto"></option>
+                  <option value="en">English</option>
+                  <option value="ru">Русский</option>
+                  <option value="uk">Українська</option>
+                </select>
+              </label>
+              <label class="setting" id="wakeLockSw" hidden>
+                <div><div data-i18n="det.wake">Не гасить экран</div><div class="setting-sub" data-i18n="det.wakeSub">На телефоне BLE часто рвётся, когда экран выключается</div></div>
                 <input id="wakeLock" class="switch" type="checkbox">
               </label>
             </div>
             <div class="raw-head">
-              <div class="section-title">Сырые данные</div>
-              <button class="btn btn-sm" id="copyRaw">Копировать</button>
+              <div class="section-title" data-i18n="det.raw">Сырые данные</div>
+              <button class="btn btn-sm" id="copyRaw" data-i18n="det.copy">Копировать</button>
             </div>
             <pre id="rawInfo"></pre>
           </div>
@@ -350,17 +361,17 @@
     <dialog id="dlg-picker">
       <div class="dlg-head">
         <div class="dlg-icon"><svg><use href="#i-bt"/></svg></div>
-        <h3 class="dlg-title">Подключение JK / JBD</h3>
+        <h3 class="dlg-title" data-i18n="dlg.title">Подключение JK / JBD</h3>
       </div>
-      <p class="dlg-text">Выберите BMS в системном окне. PIN, если спросят, обычно 123456. Web Bluetooth не умеет фоновое сканирование — только системный выбор устройства.</p>
+      <p class="dlg-text" data-i18n="dlg.text">Выберите BMS в системном окне. PIN, если спросят, обычно 123456. Web Bluetooth не умеет фоновое сканирование — только системный выбор устройства.</p>
       <div class="dlg-actions">
-        <button id="btn-choose" class="btn btn-primary">Выбрать устройство…</button>
-        <button id="btn-reconnect" class="btn">Недавние</button>
+        <button id="btn-choose" class="btn btn-primary" data-i18n="dlg.choose">Выбрать устройство…</button>
+        <button id="btn-reconnect" class="btn" data-i18n="dlg.recent">Недавние</button>
       </div>
       <div id="picker-status"></div>
       <div id="recent-list" hidden></div>
       <div class="dlg-foot">
-        <button id="btn-close-picker" class="btn btn-sm">Закрыть</button>
+        <button id="btn-close-picker" class="btn btn-sm" data-i18n="dlg.close">Закрыть</button>
       </div>
     </dialog>
   </div>
@@ -376,7 +387,7 @@ const STALE_AFTER_MS = 10000;
 const MAX_POINTS = 1000;
 const DEFAULT_MIN_MV = 2900;
 const DEFAULT_MAX_MV = 4200;
-const STORAGE_KEYS = { lastDeviceId:'bt:lastDeviceId', wakeLock:'ui:wakeLock', tab:'ui:tab', metric:'ui:chartMetric' };
+const STORAGE_KEYS = { lastDeviceId:'bt:lastDeviceId', wakeLock:'ui:wakeLock', tab:'ui:tab', metric:'ui:chartMetric', lang:'ui:lang' };
 
 const UUID = {
   JK_SVC:'0000ffe0-0000-1000-8000-00805f9b34fb',
@@ -418,13 +429,152 @@ function ago(ts,now){
   if (ms < 86400000) return `${Math.floor(ms/3600000)} h ago`;
   return `${Math.floor(ms/86400000)} d ago`;
 }
-function agoRu(ts,now){
+function agoText(ts,now){
   if(!ts) return '—';
   const s = Math.max(0, (now - ts)/1000);
-  if (s < 1.5) return 'только что';
-  if (s < 60) return `${Math.floor(s)} с назад`;
-  if (s < 3600) return `${Math.floor(s/60)} мин назад`;
-  return `${Math.floor(s/3600)} ч назад`;
+  if (s < 1.5) return t('ago.now');
+  if (s < 60) return t('ago.s', {n:Math.floor(s)});
+  if (s < 3600) return t('ago.min', {n:Math.floor(s/60)});
+  return t('ago.h', {n:Math.floor(s/3600)});
+}
+
+/* ================= i18n ================= */
+/* Язык выбирается по navigator.languages; можно переопределить в «Деталях». Добавить язык = добавить словарь. */
+const LANG_NAMES = { en:'English', ru:'Русский', uk:'Українська' };
+const LANG_ALIASES = { be:'ru', kk:'ru', ky:'ru' }; // why: русскоязычным пользователям этих локалей привычнее ru, чем en
+const I18N = {
+  en: {
+    'meta.description':'BMS monitor for JK / JBD via Web Bluetooth: voltage, current, SOC, cells, charts.',
+    'btn.connect':'Connect', 'btn.disconnect':'Disconnect', 'btn.connecting':'Connecting…',
+    'btn.btTitle':'Bluetooth: connect / disconnect',
+    'gauge.label':'charge', 'gauge.aria':'State of charge {soc}%', 'gauge.ariaUnknown':'State of charge unknown',
+    'flow.charge':'Charging', 'flow.discharge':'Discharging', 'flow.idle':'Idle', 'flow.none':'No data',
+    'eta.discharge':'Until empty', 'eta.charge':'Until full', 'eta.none':'Time', 'eta.idle':'stopped', 'eta.charging':'charging',
+    'unit.h':'h', 'unit.m':'m',
+    'tile.voltage':'Voltage', 'tile.current':'Current', 'tile.remaining':'Remaining', 'tile.capOf':'of {cap} Ah',
+    'cap.estimate':'(estimate)', 'tile.imbalance':'Cell imbalance', 'tile.temp':'Temperature', 'tile.tempMax':'(max)',
+    'tile.cycles':'Cycles', 'cycles.total':'≈ {ah} Ah total',
+    'chip.balOn':'Balancing on', 'chip.balOff':'Balancing off', 'chip.noErrors':'No errors',
+    'tab.cells':'Cells', 'tab.chart':'Chart', 'tab.details':'Details',
+    'cells.emptyTitle':'No cell data', 'cells.emptyText':'Connect to a JK or JBD BMS via Bluetooth.',
+    'cells.min':'Min', 'cells.avg':'Avg', 'cells.max':'Max', 'cells.sum':'Σ cells', 'cells.aria':'Cell voltages',
+    'chart.metricAria':'Chart metric', 'chart.aria':'Chart', 'chart.now':'Now:', 'chart.noData':'No data',
+    'metric.w':'Power', 'metric.i':'Current', 'metric.v':'Voltage', 'metric.soc':'SOC',
+    'det.device':'Device', 'det.name':'Name', 'det.protocol':'Protocol', 'det.model':'Model', 'det.capacity':'Capacity',
+    'det.data':'Data', 'det.notConnected':'not connected', 'det.fresh':'pack {pack}, cells {cells}',
+    'det.settings':'Settings', 'det.language':'Language', 'det.langAuto':'Automatic ({lang})',
+    'det.wake':'Keep screen on', 'det.wakeSub':'On phones BLE often drops when the screen turns off',
+    'det.raw':'Raw data', 'det.copy':'Copy', 'det.copied':'Copied', 'det.copyFailed':'Failed',
+    'ago.now':'just now', 'ago.s':'{n} s ago', 'ago.min':'{n} min ago', 'ago.h':'{n} h ago',
+    'dlg.title':'Connect JK / JBD',
+    'dlg.text':'Pick your BMS in the system dialog. If asked for a PIN, it is usually 123456. Web Bluetooth cannot scan in the background — only the system device picker.',
+    'dlg.choose':'Choose device…', 'dlg.recent':'Recent', 'dlg.close':'Close',
+    'picker.failed':'Could not connect: {msg}', 'picker.noRecentSupport':'This browser does not support quick access to recent devices.',
+    'picker.noRecent':'No recent devices', 'picker.unnamed':'(unnamed)', 'picker.opening':'Opening the system picker…',
+    'picker.cancelled':'Cancelled', 'picker.needClick':'Click “Choose device…”',
+    'picker.autoFailed':'Auto-connect to {name} failed: {msg}', 'picker.hint':'Press “Choose device…” (the browser requires a user gesture).',
+    'status.idle':'Not connected', 'status.disconnected':'Disconnected', 'status.noLink':'No connection to the BMS',
+    'status.retry':'Connection lost — retrying in {s} s ({n}/{max})', 'status.connecting':'Connecting to {name}…',
+    'status.connected':'{name} · {kind}', 'status.error':'Error: {msg}', 'status.btOff':'Bluetooth unavailable (adapter off?)',
+    'status.unsupported':'Web Bluetooth is not supported — use Chrome / Edge', 'status.needHttps':'Web Bluetooth requires HTTPS',
+    'err.noServices':'No supported services found', 'err.timeout':'Connection timeout',
+  },
+  ru: {
+    'meta.description':'Монитор BMS JK / JBD через Web Bluetooth: напряжение, ток, SOC, ячейки, графики.',
+    'btn.connect':'Подключить', 'btn.disconnect':'Отключить', 'btn.connecting':'Подключение…',
+    'btn.btTitle':'Bluetooth: подключить / отключить',
+    'gauge.label':'заряд', 'gauge.aria':'Уровень заряда {soc}%', 'gauge.ariaUnknown':'Уровень заряда неизвестен',
+    'flow.charge':'Заряд', 'flow.discharge':'Разряд', 'flow.idle':'Ожидание', 'flow.none':'Нет данных',
+    'eta.discharge':'До разряда', 'eta.charge':'До заряда', 'eta.none':'Время', 'eta.idle':'стоп', 'eta.charging':'заряд',
+    'unit.h':'ч', 'unit.m':'м',
+    'tile.voltage':'Напряжение', 'tile.current':'Ток', 'tile.remaining':'Остаток', 'tile.capOf':'из {cap} Ah',
+    'cap.estimate':'(оценка)', 'tile.imbalance':'Разбаланс ячеек', 'tile.temp':'Температура', 'tile.tempMax':'(макс.)',
+    'tile.cycles':'Циклы', 'cycles.total':'≈ {ah} Ah всего',
+    'chip.balOn':'Балансировка вкл.', 'chip.balOff':'Балансировка выкл.', 'chip.noErrors':'Ошибок нет',
+    'tab.cells':'Ячейки', 'tab.chart':'График', 'tab.details':'Детали',
+    'cells.emptyTitle':'Нет данных по ячейкам', 'cells.emptyText':'Подключитесь к BMS JK или JBD по Bluetooth.',
+    'cells.min':'Мин', 'cells.avg':'Сред', 'cells.max':'Макс', 'cells.sum':'Σ ячеек', 'cells.aria':'Поклеточные напряжения',
+    'chart.metricAria':'Показатель графика', 'chart.aria':'График', 'chart.now':'Сейчас:', 'chart.noData':'Нет данных',
+    'metric.w':'Мощность', 'metric.i':'Ток', 'metric.v':'Напряжение', 'metric.soc':'SOC',
+    'det.device':'Устройство', 'det.name':'Имя', 'det.protocol':'Протокол', 'det.model':'Модель', 'det.capacity':'Ёмкость',
+    'det.data':'Данные', 'det.notConnected':'не подключено', 'det.fresh':'пакет {pack}, ячейки {cells}',
+    'det.settings':'Настройки', 'det.language':'Язык', 'det.langAuto':'Автоматически ({lang})',
+    'det.wake':'Не гасить экран', 'det.wakeSub':'На телефоне BLE часто рвётся, когда экран выключается',
+    'det.raw':'Сырые данные', 'det.copy':'Копировать', 'det.copied':'Скопировано', 'det.copyFailed':'Не удалось',
+    'ago.now':'только что', 'ago.s':'{n} с назад', 'ago.min':'{n} мин назад', 'ago.h':'{n} ч назад',
+    'dlg.title':'Подключение JK / JBD',
+    'dlg.text':'Выберите BMS в системном окне. PIN, если спросят, обычно 123456. Web Bluetooth не умеет фоновое сканирование — только системный выбор устройства.',
+    'dlg.choose':'Выбрать устройство…', 'dlg.recent':'Недавние', 'dlg.close':'Закрыть',
+    'picker.failed':'Не удалось подключиться: {msg}', 'picker.noRecentSupport':'Браузер не поддерживает быстрый доступ к недавним.',
+    'picker.noRecent':'Недавних устройств нет', 'picker.unnamed':'(без имени)', 'picker.opening':'Открытие системного выбора…',
+    'picker.cancelled':'Отменено', 'picker.needClick':'Требуется клик по кнопке «Выбрать устройство…»',
+    'picker.autoFailed':'Автоподключение к {name} не удалось: {msg}', 'picker.hint':'Нажмите «Выбрать устройство…» (браузеру нужен пользовательский жест).',
+    'status.idle':'Не подключено', 'status.disconnected':'Отключено', 'status.noLink':'Нет связи с BMS',
+    'status.retry':'Связь потеряна — повтор через {s} с ({n}/{max})', 'status.connecting':'Подключение к {name}…',
+    'status.connected':'{name} · {kind}', 'status.error':'Ошибка: {msg}', 'status.btOff':'Bluetooth недоступен (адаптер выключен?)',
+    'status.unsupported':'Web Bluetooth не поддерживается — нужен Chrome / Edge', 'status.needHttps':'Web Bluetooth требует HTTPS',
+    'err.noServices':'Поддерживаемые сервисы не найдены', 'err.timeout':'Таймаут подключения',
+  },
+  uk: {
+    'meta.description':'Монітор BMS JK / JBD через Web Bluetooth: напруга, струм, SOC, комірки, графіки.',
+    'btn.connect':'Підключити', 'btn.disconnect':'Відключити', 'btn.connecting':'Підключення…',
+    'btn.btTitle':'Bluetooth: підключити / відключити',
+    'gauge.label':'заряд', 'gauge.aria':'Рівень заряду {soc}%', 'gauge.ariaUnknown':'Рівень заряду невідомий',
+    'flow.charge':'Заряд', 'flow.discharge':'Розряд', 'flow.idle':'Очікування', 'flow.none':'Немає даних',
+    'eta.discharge':'До розряду', 'eta.charge':'До заряду', 'eta.none':'Час', 'eta.idle':'стоп', 'eta.charging':'заряд',
+    'unit.h':'год', 'unit.m':'хв',
+    'tile.voltage':'Напруга', 'tile.current':'Струм', 'tile.remaining':'Залишок', 'tile.capOf':'з {cap} Ah',
+    'cap.estimate':'(оцінка)', 'tile.imbalance':'Розбаланс комірок', 'tile.temp':'Температура', 'tile.tempMax':'(макс.)',
+    'tile.cycles':'Цикли', 'cycles.total':'≈ {ah} Ah загалом',
+    'chip.balOn':'Балансування увімк.', 'chip.balOff':'Балансування вимк.', 'chip.noErrors':'Помилок немає',
+    'tab.cells':'Комірки', 'tab.chart':'Графік', 'tab.details':'Деталі',
+    'cells.emptyTitle':'Немає даних по комірках', 'cells.emptyText':'Підключіться до BMS JK або JBD через Bluetooth.',
+    'cells.min':'Мін', 'cells.avg':'Сер', 'cells.max':'Макс', 'cells.sum':'Σ комірок', 'cells.aria':'Напруги комірок',
+    'chart.metricAria':'Показник графіка', 'chart.aria':'Графік', 'chart.now':'Зараз:', 'chart.noData':'Немає даних',
+    'metric.w':'Потужність', 'metric.i':'Струм', 'metric.v':'Напруга', 'metric.soc':'SOC',
+    'det.device':'Пристрій', 'det.name':'Ім’я', 'det.protocol':'Протокол', 'det.model':'Модель', 'det.capacity':'Ємність',
+    'det.data':'Дані', 'det.notConnected':'не підключено', 'det.fresh':'пакет {pack}, комірки {cells}',
+    'det.settings':'Налаштування', 'det.language':'Мова', 'det.langAuto':'Автоматично ({lang})',
+    'det.wake':'Не вимикати екран', 'det.wakeSub':'На телефоні BLE часто обривається, коли екран вимикається',
+    'det.raw':'Сирі дані', 'det.copy':'Копіювати', 'det.copied':'Скопійовано', 'det.copyFailed':'Не вдалося',
+    'ago.now':'щойно', 'ago.s':'{n} с тому', 'ago.min':'{n} хв тому', 'ago.h':'{n} год тому',
+    'dlg.title':'Підключення JK / JBD',
+    'dlg.text':'Оберіть BMS у системному вікні. PIN, якщо запитають, зазвичай 123456. Web Bluetooth не вміє фонове сканування — лише системний вибір пристрою.',
+    'dlg.choose':'Обрати пристрій…', 'dlg.recent':'Недавні', 'dlg.close':'Закрити',
+    'picker.failed':'Не вдалося підключитися: {msg}', 'picker.noRecentSupport':'Браузер не підтримує швидкий доступ до недавніх.',
+    'picker.noRecent':'Недавніх пристроїв немає', 'picker.unnamed':'(без імені)', 'picker.opening':'Відкриття системного вибору…',
+    'picker.cancelled':'Скасовано', 'picker.needClick':'Потрібно натиснути «Обрати пристрій…»',
+    'picker.autoFailed':'Автопідключення до {name} не вдалося: {msg}', 'picker.hint':'Натисніть «Обрати пристрій…» (браузеру потрібна дія користувача).',
+    'status.idle':'Не підключено', 'status.disconnected':'Відключено', 'status.noLink':'Немає зв’язку з BMS',
+    'status.retry':'Зв’язок втрачено — повтор через {s} с ({n}/{max})', 'status.connecting':'Підключення до {name}…',
+    'status.connected':'{name} · {kind}', 'status.error':'Помилка: {msg}', 'status.btOff':'Bluetooth недоступний (адаптер вимкнено?)',
+    'status.unsupported':'Web Bluetooth не підтримується — потрібен Chrome / Edge', 'status.needHttps':'Web Bluetooth потребує HTTPS',
+    'err.noServices':'Підтримувані сервіси не знайдено', 'err.timeout':'Тайм-аут підключення',
+  },
+};
+function detectLang(){
+  const list = (navigator.languages && navigator.languages.length) ? navigator.languages : [navigator.language || 'en'];
+  for (const l of list){
+    const base = String(l).toLowerCase().split(/[-_]/)[0];
+    if (I18N[base]) return base;
+    if (LANG_ALIASES[base]) return LANG_ALIASES[base];
+  }
+  return 'en';
+}
+let langPref = storageGet(STORAGE_KEYS.lang, 'auto');
+if (langPref !== 'auto' && !I18N[langPref]) langPref = 'auto';
+let LANG = langPref === 'auto' ? detectLang() : langPref;
+function t(key, params){
+  const s = I18N[LANG]?.[key] ?? I18N.en[key] ?? key;
+  return params ? s.replace(/\{(\w+)\}/g, (m, k)=> k in params ? String(params[k]) : m) : s;
+}
+/* Translates static markup: data-i18n (text), data-i18n-title, data-i18n-aria (aria-label). */
+function applyStaticI18n(){
+  document.documentElement.lang = LANG;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t(el.dataset.i18n);
+  for (const el of document.querySelectorAll('[data-i18n-title]')) el.title = t(el.dataset.i18nTitle);
+  for (const el of document.querySelectorAll('[data-i18n-aria]')) el.setAttribute('aria-label', t(el.dataset.i18nAria));
+  document.querySelector('meta[name="description"]')?.setAttribute('content', t('meta.description'));
 }
 
 /* ================= State ================= */
@@ -495,11 +645,12 @@ function estimateEta(){
 }
 function formatEtaHours(hrs){
   if (!isNum(hrs) || hrs<0) return '—';
-  if (hrs===0) return '0 м';
+  const uh = t('unit.h'), um = t('unit.m');
+  if (hrs===0) return `0 ${um}`;
   const h = Math.floor(hrs);
   const m = Math.floor((hrs - h) * 60);
-  if (h>=100) return `${h} ч`;
-  return h ? `${h} ч ${m} м` : `${m} м`;
+  if (h>=100) return `${h} ${uh}`;
+  return h ? `${h} ${uh} ${m} ${um}` : `${m} ${um}`;
 }
 
 /* ================= DOM refs ================= */
@@ -525,14 +676,19 @@ const det = { name: $('#detName'), kind: $('#detKind'), model: $('#detModel'), c
 const wakeLockChk = $('#wakeLock');
 const SOC_ARC_LEN = 2 * Math.PI * 54;
 
-/* tone: idle | ok | warn | error */
-function setStatus(text, tone){
+/* tone: idle | ok | warn | error. Status is kept as key+params so it can be re-translated. */
+let lastStatus = { key:'status.idle', params:null };
+function setStatus(key, tone, params){
+  lastStatus = { key, params };
+  const text = t(key, params);
   statusBar.textContent = text;
   statusBar.title = text;
   if (tone) connChip.dataset.tone = tone;
 }
+let btState = 'idle';
 function setBtState(s){
-  btnBtLabel.textContent = s==='connected' ? 'Отключить' : s==='connecting' ? 'Подключение…' : 'Подключить';
+  btState = s;
+  btnBtLabel.textContent = t(s==='connected' ? 'btn.disconnect' : s==='connecting' ? 'btn.connecting' : 'btn.connect');
   btnBtEl.classList.toggle('connected', s==='connected');
   btnBtEl.classList.toggle('btn-primary', s!=='connected');
 }
@@ -621,10 +777,10 @@ const ctx = chartCanvas.getContext('2d');
 const chartPoints = []; // {t, w, i, v, soc}
 const CHART_GAP_MS = 15000; // разрыв линии, если данных не было дольше
 const METRICS = {
-  w:   { label:'Мощность',   unit:'W', color:'--c-power',   get:p=>p.w },
-  i:   { label:'Ток',        unit:'A', color:'--c-current', get:p=>p.i },
-  v:   { label:'Напряжение', unit:'V', color:'--c-volt',    get:p=>p.v },
-  soc: { label:'SOC',        unit:'%', color:'--c-soc',     get:p=>p.soc },
+  w:   { unit:'W', color:'--c-power',   get:p=>p.w },
+  i:   { unit:'A', color:'--c-current', get:p=>p.i },
+  v:   { unit:'V', color:'--c-volt',    get:p=>p.v },
+  soc: { unit:'%', color:'--c-soc',     get:p=>p.soc },
 };
 let chartMetric = METRICS[storageGet(STORAGE_KEYS.metric, 'w')] ? storageGet(STORAGE_KEYS.metric, 'w') : 'w';
 let chartHoverX = null;
@@ -684,7 +840,7 @@ function drawChart(){
   const pts = chartPoints.filter(p=>isNum(metric.get(p)));
   const n = pts.length;
   const nowEl = $('#chartNow');
-  nowEl.innerHTML = n ? `Сейчас: <b>${metric.get(pts[n-1]).toFixed(chartMetric==='soc'?0:chartMetric==='w'?1:2)} ${metric.unit}</b>` : '';
+  nowEl.innerHTML = n ? `${t('chart.now')} <b>${metric.get(pts[n-1]).toFixed(chartMetric==='soc'?0:chartMetric==='w'?1:2)} ${metric.unit}</b>` : '';
 
   const w = chartCanvas.clientWidth, h = chartCanvas.clientHeight;
   if (!w || !h) return;
@@ -749,7 +905,7 @@ function drawChart(){
   if (!n){
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = cText;
     ctx.font = '13px system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
-    ctx.fillText('Нет данных', PAD.l + pw/2, PAD.t + ph/2);
+    ctx.fillText(t('chart.noData'), PAD.l + pw/2, PAD.t + ph/2);
     ctx.restore();
     return;
   }
@@ -834,7 +990,7 @@ function renderHud(){
   hud.amp.textContent   = num(i, 2);
   hud.capRem.textContent= num(STATE.capRem, 2);
   const full = estimateFullCapacityAh();
-  hud.capFull.textContent = isNum(full) ? `из ${full.toFixed(full>=100?0:1)} Ah${isNum(STATE.capFull)?'':' (оценка)'}` : ' ';
+  hud.capFull.textContent = isNum(full) ? t('tile.capOf', {cap:full.toFixed(full>=100?0:1)}) + (isNum(STATE.capFull)?'':' '+t('cap.estimate')) : ' ';
 
   // SOC gauge
   const soc = STATE.soc;
@@ -842,17 +998,17 @@ function renderHud(){
   const s = isNum(soc) ? clamp(soc, 0, 100) : 0;
   hud.socArc.style.strokeDashoffset = String(SOC_ARC_LEN * (1 - s/100));
   hud.socGauge.dataset.level = !isNum(soc) ? 'none' : soc < 20 ? 'low' : soc < 40 ? 'mid' : 'high';
-  hud.socGauge.setAttribute('aria-label', isNum(soc) ? `Уровень заряда ${soc.toFixed(0)}%` : 'Уровень заряда неизвестен');
+  hud.socGauge.setAttribute('aria-label', isNum(soc) ? t('gauge.aria', {soc:soc.toFixed(0)}) : t('gauge.ariaUnknown'));
 
   // flow + ETA
   const eta = estimateEta();
   const flow = eta.mode ?? (isNum(i) ? (i > CHG.IDLE_A ? 'charge' : i < -CHG.IDLE_A ? 'discharge' : 'idle') : 'none');
   hud.flow.dataset.flow = flow;
   hud.flowIcon.setAttribute('href', flow==='charge' ? '#i-bolt' : flow==='discharge' ? '#i-down' : '#i-pause');
-  hud.flowText.textContent = flow==='charge' ? 'Заряд' : flow==='discharge' ? 'Разряд' : flow==='idle' ? 'Ожидание' : 'Нет данных';
-  hud.etaLabel.textContent = eta.mode==='discharge' ? 'До разряда' : eta.mode==='charge' ? 'До заряда' : 'Время';
-  hud.eta.textContent = eta.mode==='idle' ? 'стоп'
-    : eta.mode==='charge' && !isNum(eta.hours) ? 'заряд'
+  hud.flowText.textContent = t('flow.' + flow);
+  hud.etaLabel.textContent = t(eta.mode==='discharge' ? 'eta.discharge' : eta.mode==='charge' ? 'eta.charge' : 'eta.none');
+  hud.eta.textContent = eta.mode==='idle' ? t('eta.idle')
+    : eta.mode==='charge' && !isNum(eta.hours) ? t('eta.charging')
     : formatEtaHours(eta.hours);
 
   // cells delta
@@ -879,15 +1035,15 @@ function renderHud(){
 
   // cycles
   hud.cycles.textContent = isNum(STATE.cycles) ? String(STATE.cycles) : '—';
-  hud.cyclesSub.textContent = isNum(STATE.cycles) && isNum(full) ? `≈ ${(STATE.cycles*full).toFixed(0)} Ah всего` : ' ';
+  hud.cyclesSub.textContent = isNum(STATE.cycles) && isNum(full) ? t('cycles.total', {ah:(STATE.cycles*full).toFixed(0)}) : ' ';
 
   // chips
   const bal = !!STATE.balancing;
-  hud.balText.textContent = bal ? 'Балансировка вкл.' : 'Балансировка выкл.';
+  hud.balText.textContent = t(bal ? 'chip.balOn' : 'chip.balOff');
   hud.bal.className = 'chip' + (bal ? ' on':'');
   const err = (STATE.errors||'').trim();
   const bad = !!err && err.toUpperCase()!=='OK';
-  hud.errorsText.textContent = bad ? err : 'Ошибок нет';
+  hud.errorsText.textContent = bad ? err : t('chip.noErrors');
   hud.errors.className = 'chip ' + (bad ? 'err':'ok');
 }
 
@@ -895,18 +1051,18 @@ function renderHud(){
 function renderDetails(){
   const now = Date.now();
   det.name.textContent = conn.device ? (conn.device.name || conn.device.id) : '—';
-  det.kind.textContent = conn.driver ? conn.driver.kind : (conn.device ? '—' : 'не подключено');
+  det.kind.textContent = conn.driver ? conn.driver.kind : (conn.device ? '—' : t('det.notConnected'));
   det.model.textContent = STATE.model || '—';
   const full = estimateFullCapacityAh();
-  det.cap.textContent = isNum(full) ? `${full.toFixed(1)} Ah${isNum(STATE.capFull)?'':' (оценка)'}` : '—';
-  det.fresh.textContent = STATE.lastSummaryTs ? `пакет ${agoRu(STATE.lastSummaryTs, now)}, ячейки ${agoRu(STATE.lastCellsTs, now)}` : '—';
+  det.cap.textContent = isNum(full) ? `${full.toFixed(1)} Ah` + (isNum(STATE.capFull)?'':' '+t('cap.estimate')) : '—';
+  det.fresh.textContent = STATE.lastSummaryTs ? t('det.fresh', {pack:agoText(STATE.lastSummaryTs, now), cells:agoText(STATE.lastCellsTs, now)}) : '—';
   rawInfo.textContent = compileBatInfo();
 }
 $('#copyRaw').addEventListener('click', async (e)=>{
   const b = e.currentTarget;
-  try{ await navigator.clipboard.writeText(compileBatInfo()); b.textContent = 'Скопировано'; }
-  catch{ b.textContent = 'Не удалось'; }
-  setTimeout(()=>{ b.textContent = 'Копировать'; }, 1500);
+  try{ await navigator.clipboard.writeText(compileBatInfo()); b.textContent = t('det.copied'); }
+  catch{ b.textContent = t('det.copyFailed'); }
+  setTimeout(()=>{ b.textContent = t('det.copy'); }, 1500);
 });
 
 function compileBatInfo(){
@@ -959,7 +1115,7 @@ async function syncWakeLock(){
   }catch(e){ console.warn('wakeLock', e); }
 }
 if ('wakeLock' in navigator){
-  $('#settingsBlock').hidden = false;
+  $('#wakeLockSw').hidden = false;
   wakeLockChk.checked = storageGet(STORAGE_KEYS.wakeLock, '0') === '1';
   wakeLockChk.addEventListener('change', ()=>{ storageSet(STORAGE_KEYS.wakeLock, wakeLockChk.checked?'1':'0'); syncWakeLock(); });
   document.addEventListener('visibilitychange', syncWakeLock);
@@ -1265,7 +1421,7 @@ async function createDriver(server){
   if (hasJBD) return makeJbd(server, applyUpdate);
   const hasJK = await server.getPrimaryService(UUID.JK_SVC).then(()=>true,()=>false);
   if (hasJK) return makeJk(server, applyUpdate);
-  throw new Error('Поддерживаемые сервисы не найдены');
+  throw new Error(t('err.noServices'));
 }
 
 /* Remembered devices may need an advertisement before gatt.connect() succeeds. */
@@ -1289,7 +1445,7 @@ function onGattDisconnected(ev){
   if (d) d.stop().catch(()=>{});
   setBtState('idle');
   if (!wasConnected) return;
-  if (conn.userDisconnect){ setStatus('Отключено', 'idle'); return; }
+  if (conn.userDisconnect){ setStatus('status.disconnected', 'idle'); return; }
   conn.attempts = 0;
   scheduleReconnect();
 }
@@ -1300,10 +1456,10 @@ function cancelReconnect(){
 function scheduleReconnect(){
   cancelReconnect();
   if (!conn.device || conn.userDisconnect) return;
-  if (conn.attempts >= RECONNECT_MAX_ATTEMPTS){ setStatus('Нет связи с BMS', 'error'); return; }
+  if (conn.attempts >= RECONNECT_MAX_ATTEMPTS){ setStatus('status.noLink', 'error'); return; }
   const delay = Math.min(30000, 1000 * 2 ** conn.attempts);
   conn.attempts++;
-  setStatus(`Связь потеряна — повтор через ${Math.round(delay/1000)} с (${conn.attempts}/${RECONNECT_MAX_ATTEMPTS})`, 'warn');
+  setStatus('status.retry', 'warn', {s:Math.round(delay/1000), n:conn.attempts, max:RECONNECT_MAX_ATTEMPTS});
   conn.reconnectTimer = setTimeout(async ()=>{
     conn.reconnectTimer = null;
     try{ await connect(conn.device, {advertise:true, quiet:true}); }
@@ -1335,16 +1491,16 @@ async function connect(device, opts={}){
     device.removeEventListener('gattserverdisconnected', onGattDisconnected);
     device.addEventListener('gattserverdisconnected', onGattDisconnected);
     setBtState('connecting');
-    setStatus(`Подключение к ${name}…`, 'warn');
+    setStatus('status.connecting', 'warn', {name});
     if (opts.advertise) await waitForAdvertisement(device, 8000);
-    const server = await withTimeout(device.gatt.connect(), CONNECT_TIMEOUT_MS, 'Таймаут подключения');
+    const server = await withTimeout(device.gatt.connect(), CONNECT_TIMEOUT_MS, t('err.timeout'));
     const driver = await createDriver(server);
     conn.driver = driver;
     await driver.start();
     conn.connected = true;
     conn.attempts = 0;
     storageSet(STORAGE_KEYS.lastDeviceId, device.id || '');
-    setStatus(`${name} · ${driver.kind}`, 'ok');
+    setStatus('status.connected', 'ok', {name, kind:driver.kind});
     setBtState('connected');
     return true;
   }catch(err){
@@ -1353,7 +1509,7 @@ async function connect(device, opts={}){
     if (d){ try{ await d.stop(); }catch{} }
     try{ device.gatt.disconnect(); }catch{}
     setBtState('idle');
-    if (!opts.quiet) setStatus(`Ошибка: ${errMsg(err)}`, 'error');
+    if (!opts.quiet) setStatus('status.error', 'error', {msg:errMsg(err)});
     throw err;
   }finally{ busy = false; }
 }
@@ -1363,7 +1519,7 @@ async function disconnect(){
   cancelReconnect();
   await teardown();
   setBtState('idle');
-  setStatus('Отключено', 'idle');
+  setStatus('status.disconnected', 'idle');
 }
 
 /* ================= BT button + picker ================= */
@@ -1387,39 +1543,39 @@ btnBtEl.addEventListener('click', async ()=>{
     try{ await disconnect(); } finally{ busy = false; }
     return;
   }
-  if (conn.reconnectTimer){ conn.userDisconnect = true; cancelReconnect(); setStatus('Не подключено', 'idle'); }
+  if (conn.reconnectTimer){ conn.userDisconnect = true; cancelReconnect(); setStatus('status.idle', 'idle'); }
   openPicker();
 });
 btnClosePicker.addEventListener('click', ()=> dlg.close());
 
 async function connectFromPicker(device, advertise){
-  pickerStatus.textContent = `Подключение к ${device.name||device.id}…`;
+  pickerStatus.textContent = t('status.connecting', {name:device.name||device.id});
   try{
     await connect(device, {advertise});
     dlg.close();
   }catch(err){
-    pickerStatus.textContent = 'Не удалось подключиться: ' + errMsg(err);
+    pickerStatus.textContent = t('picker.failed', {msg:errMsg(err)});
   }
 }
 
 btnReconnect.addEventListener('click', async ()=>{
   if (!('bluetooth' in navigator) || typeof navigator.bluetooth.getDevices !== 'function'){
-    pickerStatus.textContent = 'Браузер не поддерживает быстрый доступ к недавним.'; return;
+    pickerStatus.textContent = t('picker.noRecentSupport'); return;
   }
   let list = [];
   try{ list = await navigator.bluetooth.getDevices(); }
-  catch(err){ pickerStatus.textContent = 'Ошибка: ' + errMsg(err); return; }
+  catch(err){ pickerStatus.textContent = t('status.error', {msg:errMsg(err)}); return; }
   recentList.replaceChildren();
   recentList.hidden = false;
-  if (!list.length){ const e = document.createElement('div'); e.className = 'recent-empty'; e.textContent = 'Недавних устройств нет'; recentList.appendChild(e); return; }
+  if (!list.length){ const e = document.createElement('div'); e.className = 'recent-empty'; e.textContent = t('picker.noRecent'); recentList.appendChild(e); return; }
   for (const dev of list){
     // why: имя BLE-устройства задаёт кто угодно поблизости — только textContent, без innerHTML
     const item = document.createElement('div'); item.className = 'recent-item';
     const info = document.createElement('div');
-    info.append(document.createTextNode(dev.name || '(без имени)'));
+    info.append(document.createTextNode(dev.name || t('picker.unnamed')));
     const id = document.createElement('span'); id.className = 'id'; id.textContent = dev.id;
     info.append(id);
-    const btn = document.createElement('button'); btn.className = 'btn btn-sm'; btn.textContent = 'Подключить';
+    const btn = document.createElement('button'); btn.className = 'btn btn-sm'; btn.textContent = t('btn.connect');
     btn.addEventListener('click', ()=> connectFromPicker(dev, true));
     item.append(info, btn);
     recentList.appendChild(item);
@@ -1429,15 +1585,15 @@ btnReconnect.addEventListener('click', async ()=>{
 btnChoose.addEventListener('click', async ()=>{
   let device;
   try{
-    pickerStatus.textContent = 'Открытие системного выбора…';
+    pickerStatus.textContent = t('picker.opening');
     device = await navigator.bluetooth.requestDevice({
       filters:[{services:[UUID.JK_SVC]},{services:[UUID.JBD_SVC]}],
       optionalServices:[UUID.JK_SVC,UUID.JBD_SVC]
     });
   }catch(err){
-    pickerStatus.textContent = err?.name==='NotFoundError' ? 'Отменено'
-      : err?.name==='SecurityError' ? 'Требуется клик по кнопке «Выбрать устройство…»'
-      : 'Ошибка: ' + errMsg(err);
+    pickerStatus.textContent = err?.name==='NotFoundError' ? t('picker.cancelled')
+      : err?.name==='SecurityError' ? t('picker.needClick')
+      : t('status.error', {msg:errMsg(err)});
     return;
   }
   await connectFromPicker(device, false);
@@ -1448,7 +1604,7 @@ async function autoConnectOnLoad(){
   if (!('bluetooth' in navigator)) return;
   let available = true;
   try{ if (typeof navigator.bluetooth.getAvailability === 'function') available = await navigator.bluetooth.getAvailability(); }catch{}
-  if (!available){ setStatus('Bluetooth недоступен (адаптер выключен?)', 'error'); return; }
+  if (!available){ setStatus('status.btOff', 'error'); return; }
   if (typeof navigator.bluetooth.getDevices === 'function'){
     try{
       const granted = await navigator.bluetooth.getDevices();
@@ -1456,15 +1612,37 @@ async function autoConnectOnLoad(){
       const dev = (lastId && granted.find(d=>d.id===lastId)) || granted[0];
       if (dev){
         try{ await connect(dev, {advertise:true}); return; }
-        catch(err){ openPicker(`Автоподключение к ${dev.name||dev.id} не удалось: ${errMsg(err)}`); return; }
+        catch(err){ openPicker(t('picker.autoFailed', {name:dev.name||dev.id, msg:errMsg(err)})); return; }
       }
     }catch(e){ console.warn('autoConnectOnLoad (granted) failed:', e); }
   }
-  openPicker('Нажмите «Выбрать устройство…» (браузеру нужен пользовательский жест).');
+  openPicker(t('picker.hint'));
 }
 
+/* ================= Language ================= */
+const langSelect = $('#langSelect');
+function applyLanguage(){
+  applyStaticI18n();
+  langSelect.options[0].textContent = t('det.langAuto', {lang: LANG_NAMES[detectLang()]});
+  langSelect.value = langPref;
+  setStatus(lastStatus.key, null, lastStatus.params);
+  setBtState(btState);
+  render();
+}
+langSelect.addEventListener('change', ()=>{
+  langPref = langSelect.value;
+  storageSet(STORAGE_KEYS.lang, langPref);
+  LANG = langPref === 'auto' ? detectLang() : langPref;
+  applyLanguage();
+});
+window.addEventListener('languagechange', ()=>{
+  if (langPref === 'auto') LANG = detectLang();
+  applyLanguage();
+});
+
 /* ================= Init ================= */
-setStatus('Не подключено', 'idle');
+applyLanguage();
+setStatus('status.idle', 'idle');
 setChartMetric(chartMetric);
 setTab(storageGet(STORAGE_KEYS.tab, 'cells'));
 render();
@@ -1480,7 +1658,7 @@ setInterval(()=>{
 if (!('bluetooth' in navigator)){
   btnBtEl.setAttribute('disabled','');
   $('#cellsConnect').setAttribute('disabled','');
-  setStatus(window.isSecureContext ? 'Web Bluetooth не поддерживается — нужен Chrome / Edge' : 'Web Bluetooth требует HTTPS', 'error');
+  setStatus(window.isSecureContext ? 'status.unsupported' : 'status.needHttps', 'error');
 } else {
   window.addEventListener('load', ()=>{ autoConnectOnLoad().catch(()=>{}); });
 }
