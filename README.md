@@ -1,72 +1,75 @@
 # web-bms
 
-Монитор аккумулятора для BMS **JK** и **JBD** (Xiaoxiang) через **Web Bluetooth** — одна статическая страница, без сборки.
+**English** · [Русский](README.ru.md)
 
-**Онлайн:** https://antondziuin.github.io/web-bms/
+Battery monitor for **JK** and **JBD** (Xiaoxiang) BMS over **Web Bluetooth** — a static web page, no build step.
 
-## Возможности
+**Live:** https://antondziuin.github.io/web-bms/
 
-- Кольцевой индикатор SOC, мощность, режим (заряд / разряд / ожидание) и время до заряда/разряда
-- Напряжение, ток, остаток и полная ёмкость, разбаланс ячеек, температуры (T1/T2/MOS), циклы
-- Напряжения ячеек (до 32) со сводкой мин / сред / макс и подсветкой крайних ячеек
-- **Несколько батарей одновременно**: переключатель батарей и режим «Все» — суммарный ток,
-  мощность и ёмкость, средневзвешенный SOC, обзор всех батарей; все подключённые батареи
-  переподключаются автоматически при следующем открытии
-- **Счётчики сессии**: заряжено / разряжено (Ah, Wh), баланс, пики заряда и разряда, мин/макс
-  напряжения пакета и ячеек, SOC в начале и сейчас, максимальная температура и разбаланс; сброс
-- Графики мощности, тока, напряжения и SOC (последние 1000 точек) с подсказкой по наведению/касанию
-- Вкладка «Детали»: информация об устройстве, настройки, сырые данные с копированием
-- **Работа без интернета** (по желанию): приложение предлагает сохранить себя на устройстве и
-  затем открывается без сети; можно установить на главный экран
-- Светлая и тёмная тема (по настройке системы), адаптивная раскладка для телефона и десктопа
-- Интерфейс на английском, русском и украинском: язык выбирается автоматически по настройкам браузера, его можно сменить вручную во вкладке «Детали»
-- Автоматическое переподключение при обрыве связи
-- Опционально: удержание экрана включённым
+## Features
 
-## Требования
+- SOC ring gauge, power, mode (charging / discharging / idle) and time to full or empty
+- Voltage, current, remaining and full capacity, cell imbalance, temperatures (T1/T2/MOS), cycles
+- Cell voltages (up to 32) with a min / avg / max summary and the extreme cells highlighted
+- **Multiple batteries at once**: battery switcher and an "All" view — summed current,
+  power and capacity, capacity-weighted SOC, overview of every battery; all connected
+  batteries reconnect automatically next time the page is opened
+- **Session counters**: charged / discharged (Ah, Wh), net, peak charge and discharge,
+  pack and cell voltage min/max, SOC at start and now, max temperature and imbalance; reset
+- Power, current, voltage and SOC charts (last 1000 points) with a hover/tap tooltip
+- "Details" tab: device info, settings, raw data with a copy button
+- **Offline mode** (opt-in): the app offers to save itself on the device and then opens
+  without a network; it can be installed to the home screen
+- Light and dark themes (follow the system), responsive layout for phones and desktops
+- English, Russian and Ukrainian UI: the language follows the browser settings and can be
+  changed manually in the "Details" tab
+- Automatic reconnection when the link drops
+- Optional: keep the screen on
 
-- Chrome / Edge (desktop или Android). Firefox и Safari Web Bluetooth не поддерживают;
-  на iOS можно использовать браузер Bluefy.
-- HTTPS (GitHub Pages) или `http://localhost`.
+## Requirements
 
-## Локальный запуск
+- Chrome / Edge (desktop or Android). Firefox and Safari do not support Web Bluetooth;
+  on iOS the Bluefy browser can be used.
+- HTTPS (GitHub Pages) or `http://localhost`.
+
+## Run locally
 
 ```sh
 npm install
 npm start          # http://localhost:8080
 ```
 
-## Тесты
+## Tests
 
 ```sh
-npm test           # ESLint + юнит-тесты + браузерные тесты
-npm run test:unit  # протоколы JK/JBD, модель, счётчики сессии, словари (node:test)
-npm run test:e2e   # приложение в headless Chromium с имитацией Bluetooth (Playwright)
+npm test           # ESLint + unit tests + browser tests
+npm run test:unit  # JK/JBD protocols, model, session counters, dictionaries (node:test)
+npm run test:e2e   # the app in headless Chromium with a Bluetooth mock (Playwright)
 ```
 
-Браузерные тесты подменяют `navigator.bluetooth` эмулятором, который отдаёт побайтно
-точные кадры JBD и JK (`tests/fixtures/frames.mjs`), и проверяют подключение, значения,
-несколько батарей, сессию, переподключение, локализацию и работу без интернета.
-Перед первым запуском на своей машине: `npx playwright install chromium`.
+The browser tests replace `navigator.bluetooth` with an emulator that sends byte-accurate
+JBD and JK frames (`tests/fixtures/frames.mjs`) and check connecting, displayed values,
+multiple batteries, sessions, reconnection, localization and offline mode.
+Before the first run on your machine: `npx playwright install chromium`.
 
-Тесты запускаются в GitHub Actions на каждый пулл-реквест (`.github/workflows/test.yml`),
-а публикация на Pages выполняется только после успешных тестов.
+GitHub Actions runs the tests on every pull request (`.github/workflows/test.yml`),
+and GitHub Pages is deployed only after the tests pass.
 
-## Структура
+## Project layout
 
-| Файл | Назначение |
+| File | Purpose |
 | --- | --- |
-| `index.html`, `css/styles.css` | разметка и стили |
-| `js/protocols.js` | разбор кадров JK / JBD (без DOM, покрыт юнит-тестами) |
-| `js/ble.js` | драйверы BLE поверх GATT |
-| `js/model.js`, `js/session.js` | состояние батареи, сумма по батареям, счётчики сессии |
-| `js/chart.js`, `js/i18n.js`, `js/offline.js` | график, переводы, работа без интернета |
-| `js/app.js` | менеджер батарей и интерфейс |
-| `sw.js` | service worker (включается только по согласию пользователя) |
+| `index.html`, `css/styles.css` | markup and styles |
+| `js/protocols.js` | JK / JBD frame parsing (no DOM, covered by unit tests) |
+| `js/ble.js` | BLE drivers on top of GATT |
+| `js/model.js`, `js/session.js` | battery state, multi-battery aggregate, session counters |
+| `js/chart.js`, `js/i18n.js`, `js/offline.js` | chart, translations, offline mode |
+| `js/app.js` | battery manager and UI |
+| `sw.js` | service worker (registered only after the user opts in) |
 
-## Публикация на GitHub Pages
+## Deploying to GitHub Pages
 
-Деплой выполняется workflow `.github/workflows/pages.yml` при каждом push в `main`
-(или вручную: *Actions → Deploy to GitHub Pages → Run workflow*).
+The `.github/workflows/pages.yml` workflow deploys on every push to `main`
+(or manually: *Actions → Deploy to GitHub Pages → Run workflow*).
 
-Один раз нужно включить Pages: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+Pages has to be enabled once: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
