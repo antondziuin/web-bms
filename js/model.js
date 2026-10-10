@@ -5,7 +5,10 @@ import { isNum } from './util.js';
 export const MAX_CELLS = 32;
 export const DEFAULT_MIN_MV = 2900;
 export const DEFAULT_MAX_MV = 4200;
-export const CHG = { MIN_CHG_A: 0.10, MIN_SOC: 1, IDLE_A: 0.01 };
+export const CHG = { MIN_CHG_A: 0.10, MIN_SOC: 1, IDLE_A: 0.01, MIN_CHG_W: 2, IDLE_W: 0.5 };
+/* Packs whose voltages differ more than this are separate systems (e.g. a 4S and a 14S pack):
+   their voltages, currents and Ah cannot be averaged or added up, only watts and watt-hours can. */
+export const SAME_BUS_RATIO = 1.15;
 
 const NUMERIC_KEYS = ['totalV','current','soc','capRem','capFull','cycles','temp1','temp2','tmos','cfgSoc0mV','cfgSoc100mV','cfgUvpMv','cfgOvpMv'];
 
@@ -35,7 +38,12 @@ export function applyUpdate(state, p, now = Date.now()){
   return res;
 }
 
-export function powerW(s){ const w = s.totalV * s.current; return isNum(w) ? w : NaN; }
+/* The aggregate carries its own power (sum over packs); a pack's power is V × I. */
+export function powerW(s){
+  if (isNum(s.power)) return s.power;
+  const w = s.totalV * s.current;
+  return isNum(w) ? w : NaN;
+}
 export function activeCells(s){ return s.cells.filter(v=>isNum(v) && v>0); }
 export function maxTemp(s){ const tt = [s.temp1, s.temp2].filter(isNum); return tt.length ? Math.max(...tt) : NaN; }
 export function cellDeltaMv(s){
@@ -58,6 +66,7 @@ export function estimateFullCapacityAh(s){
 }
 /* returns {mode:'discharge'|'charge'|'idle'|null, hours:NaN|number} */
 export function estimateEta(s){
+  if (isNum(s.power)) return estimateEtaEnergy(s);
   const i = s.current, rem = s.capRem;
   if (!isNum(i) || !isNum(rem)) return {mode:null, hours:NaN};
   if (i < -CHG.IDLE_A) return {mode:'discharge', hours: rem / (-i)};
@@ -69,26 +78,51 @@ export function estimateEta(s){
   return {mode:'charge', hours: Math.max(0, full - rem) / i};
 }
 
-/* Combines several packs (connected in parallel) into one system-level state:
-   currents and capacities add up, voltage is averaged, SOC is weighted by capacity,
-   temperatures take the maximum. Packs without fresh data are ignored. */
-export function aggregateStates(states){
-  const agg = createState();
-  const live = states.filter(s => s.lastSummaryTs);
-  if (!live.length) return agg;
-  const sum = (key) => { const v = live.map(s=>s[key]).filter(isNum); return v.length ? v.reduce((a,b)=>a+b,0) : NaN; };
+/* Aggregate ETA in energy terms (Wh / W), valid for packs of any voltage. */
+function estimateEtaEnergy(s){
+  const p = s.power, rem = s.energyRemWh, full = s.energyFullWh;
+  if (p < -CHG.IDLE_W) return {mode:'discharge', hours: isNum(rem) ? rem / (-p) : NaN};
+  if (p <= CHG.IDLE_W) return {mode:'idle', hours:NaN};
+  if (p <= CHG.MIN_CHG_W) return {mode:'charge', hours:NaN};
+  if (isNum(s.soc) && s.soc >= 100) return {mode:'charge', hours:0};
+  if (!isNum(rem) || !isNum(full)) return {mode:'charge', hours:NaN};
+  return {mode:'charge', hours: Math.max(0, full - rem) / p};
+}
+
+const sumAll = (v) => v.length && v.every(isNum) ? v.reduce((a,b)=>a+b,0) : NaN;
+const sumFinite = (v) => { const f = v.filter(isNum); return f.length ? f.reduce((a,b)=>a+b,0) : NaN; };
+
+/* Combines several packs into one system-level state. Power and energy (Wh) are summed per pack,
+   so packs of different voltages (4S next to 14S) combine correctly; SOC is weighted by energy.
+   Voltage (average), current and Ah (sums) are only given when all packs sit at about the same
+   voltage (parallel packs), otherwise they are NaN. Temperatures take the maximum.
+   isLive(state): packs whose current/power still count — a pack that lost its link keeps its
+   last SOC and energy, but must not keep "charging" with its last current. Packs without data are ignored. */
+export function aggregateStates(states, isLive = () => true){
+  const agg = Object.assign(createState(), { power:NaN, energyRemWh:NaN, energyFullWh:NaN });
+  const packs = states.filter(s => s.lastSummaryTs);
+  if (!packs.length) return agg;
+  const flowing = packs.filter(isLive);
   const maxOf = (key) => { const v = states.map(s=>s[key]).filter(isNum); return v.length ? Math.max(...v) : NaN; };
-  const volts = live.map(s=>s.totalV).filter(isNum);
-  agg.totalV = volts.length ? volts.reduce((a,b)=>a+b,0) / volts.length : NaN;
-  agg.current = sum('current');
-  agg.capRem = sum('capRem');
-  const fulls = live.map(estimateFullCapacityAh);
-  agg.capFull = fulls.every(isNum) ? fulls.reduce((a,b)=>a+b,0) : NaN;
-  if (isNum(agg.capFull) && agg.capFull > 0 && isNum(agg.capRem)) agg.soc = Math.min(100, agg.capRem / agg.capFull * 100);
-  else { const socs = live.map(s=>s.soc).filter(isNum); agg.soc = socs.length ? socs.reduce((a,b)=>a+b,0) / socs.length : NaN; }
+  const volts = packs.map(s=>s.totalV).filter(isNum);
+  const sameBus = volts.length < 2 || Math.max(...volts) <= Math.min(...volts) * SAME_BUS_RATIO;
+  const fulls = packs.map(estimateFullCapacityAh);
+
+  agg.power = sumFinite(flowing.map(powerW));
+  agg.energyRemWh = sumAll(packs.map(s => s.capRem * s.totalV));
+  agg.energyFullWh = sumAll(packs.map((s, k) => fulls[k] * s.totalV));
+  if (sameBus){
+    agg.totalV = volts.length ? volts.reduce((a,b)=>a+b,0) / volts.length : NaN;
+    agg.current = sumFinite(flowing.map(s=>s.current));
+    agg.capRem = sumFinite(packs.map(s=>s.capRem));
+    agg.capFull = sumAll(fulls);
+  }
+  if (isNum(agg.energyFullWh) && agg.energyFullWh > 0 && isNum(agg.energyRemWh)) agg.soc = Math.min(100, agg.energyRemWh / agg.energyFullWh * 100);
+  else if (isNum(agg.capFull) && agg.capFull > 0 && isNum(agg.capRem)) agg.soc = Math.min(100, agg.capRem / agg.capFull * 100);
+  else { const socs = packs.map(s=>s.soc).filter(isNum); agg.soc = socs.length ? socs.reduce((a,b)=>a+b,0) / socs.length : NaN; }
   agg.temp1 = maxOf('temp1'); agg.temp2 = maxOf('temp2'); agg.tmos = maxOf('tmos');
   agg.balancing = states.some(s=>s.balancing);
-  agg.lastSummaryTs = Math.max(...live.map(s=>s.lastSummaryTs));
+  agg.lastSummaryTs = Math.max(...packs.map(s=>s.lastSummaryTs));
   agg.lastCellsTs = Math.max(0, ...states.map(s=>s.lastCellsTs));
   return agg;
 }

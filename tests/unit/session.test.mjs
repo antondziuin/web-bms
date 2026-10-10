@@ -41,3 +41,10 @@ test('extremes: pack voltage, SOC, temperatures, cells', () => {
   assert.equal(s.cellMax, 3.34); assert.equal(s.cellMaxIdx, 3);
   close(s.deltaMaxMv, 70);
 });
+
+test('explicit power overrides V × I (aggregate of packs with different voltages)', () => {
+  const s = createSession(0);
+  for (let t = 0; t <= 3600; t++) sessionAddSummary(s, { v: NaN, i: NaN, w: 600 }, t * 1000);
+  close(s.whIn, 600); assert.equal(s.ahIn, 0);
+  assert.equal(s.peakChgW, 600); assert.equal(s.peakChgA, 0);
+});

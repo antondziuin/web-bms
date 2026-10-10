@@ -18,27 +18,24 @@ export function createSession(now = Date.now()){
   };
 }
 
-/* Feeds one pack-level sample: v (V), i (A, + = charge), soc (%), temps (°C list). */
-export function sessionAddSummary(s, {v, i, soc, temps = []}, now = Date.now()){
-  const w = v * i;
-  if (isNum(i) && isNum(s.lastI)){
-    const dt = now - s.lastTs;
-    if (dt > 0 && dt <= SESSION_MAX_GAP_MS){
-      const h = dt / 3600000;
-      const ai = (s.lastI + i) / 2;
-      if (ai > 0) s.ahIn += ai * h; else s.ahOut += -ai * h;
-      if (isNum(w) && isNum(s.lastW)){
-        const aw = (s.lastW + w) / 2;
-        if (aw > 0) s.whIn += aw * h; else s.whOut += -aw * h;
-      }
-    }
+/* Feeds one sample: v (V), i (A, + = charge), w (W, defaults to v × i — the aggregate of packs with
+   different voltages passes its own sum), soc (%), temps (°C list). */
+export function sessionAddSummary(s, {v, i, w = v * i, soc, temps = []}, now = Date.now()){
+  const dt = now - s.lastTs;
+  const h = dt > 0 && dt <= SESSION_MAX_GAP_MS ? dt / 3600000 : 0;
+  if (h && isNum(i) && isNum(s.lastI)){
+    const ai = (s.lastI + i) / 2;
+    if (ai > 0) s.ahIn += ai * h; else s.ahOut += -ai * h;
   }
+  if (h && isNum(w) && isNum(s.lastW)){
+    const aw = (s.lastW + w) / 2;
+    if (aw > 0) s.whIn += aw * h; else s.whOut += -aw * h;
+  }
+  if (isNum(i) || isNum(w)){ s.lastTs = now; s.lastI = i; s.lastW = w; }
   if (isNum(i)){
-    s.lastI = i; s.lastTs = now;
     if (i > 0) s.peakChgA = Math.max(s.peakChgA, i); else s.peakDisA = Math.max(s.peakDisA, -i);
   }
   if (isNum(w)){
-    s.lastW = w;
     if (w > 0) s.peakChgW = Math.max(s.peakChgW, w); else s.peakDisW = Math.max(s.peakDisW, -w);
   }
   if (isNum(v)){

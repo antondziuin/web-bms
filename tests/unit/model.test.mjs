@@ -42,9 +42,35 @@ test('aggregate of parallel packs', () => {
   const b = withState({ totalV: 53.0, current: 5, capRem: 30, capFull: 50, soc: 60, temp1: 31, tmos: 40, balancing: true, lastSummaryTs: 2 });
   const agg = aggregateStates([a, b]);
   close(agg.totalV, 53.1); close(agg.current, -7.34); close(agg.capRem, 110); close(agg.capFull, 150);
-  close(agg.soc, 110 / 150 * 100);
+  close(powerW(agg), 53.2 * -12.34 + 53.0 * 5);
+  close(agg.soc, (80 * 53.2 + 30 * 53.0) / (100 * 53.2 + 50 * 53.0) * 100); // weighted by energy
   assert.equal(agg.temp1, 31); assert.equal(agg.tmos, 40); assert.equal(agg.balancing, true);
   assert.equal(agg.lastSummaryTs, 2);
+});
+
+test('aggregate of packs with different voltages: power is the sum of pack powers', () => {
+  // two 4S packs charging at ~300 W each, a 14S pack idle: the system takes 600 W, not avgV × ΣI ≈ 1100 W
+  const a = withState({ totalV: 14.0, current: 300 / 14, capRem: 50, capFull: 100, soc: 50, lastSummaryTs: 1 });
+  const b = withState({ totalV: 14.0, current: 300 / 14, capRem: 50, capFull: 100, soc: 50, lastSummaryTs: 1 });
+  const c = withState({ totalV: 50.0, current: 0, capRem: 80, capFull: 100, soc: 80, lastSummaryTs: 1 });
+  const agg = aggregateStates([a, b, c]);
+  close(powerW(agg), 600);
+  assert.ok(Number.isNaN(agg.totalV) && Number.isNaN(agg.current), 'no average voltage / summed current across buses');
+  assert.ok(Number.isNaN(agg.capRem) && Number.isNaN(agg.capFull), 'Ah of different voltages do not add up');
+  close(agg.energyRemWh, 50 * 14 * 2 + 80 * 50); close(agg.energyFullWh, 100 * 14 * 2 + 100 * 50);
+  close(agg.soc, 5400 / 7800 * 100);
+  assert.deepEqual(estimateEta(agg), { mode: 'charge', hours: (7800 - 5400) / 600 });
+  const dis = aggregateStates([withState({ ...a, current: -10 }), c]);
+  close(powerW(dis), -140);
+  assert.deepEqual(estimateEta(dis), { mode: 'discharge', hours: (700 + 4000) / 140 });
+  assert.equal(estimateEta(aggregateStates([withState({ ...a, current: 0 }), c])).mode, 'idle');
+});
+
+test('aggregate: a pack that lost its link keeps its energy but not its current', () => {
+  const a = withState({ totalV: 53.2, current: -10, capRem: 80, capFull: 100, lastSummaryTs: 1 });
+  const b = withState({ totalV: 53.0, current: 20, capRem: 30, capFull: 50, lastSummaryTs: 2 });
+  const agg = aggregateStates([a, b], s => s !== b);
+  close(agg.current, -10); close(powerW(agg), -532); close(agg.capRem, 110);
 });
 
 test('aggregate ignores packs without data', () => {

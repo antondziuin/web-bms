@@ -184,6 +184,36 @@ test('multiple batteries: switcher, aggregate view, auto-connect of remembered d
   await done();
 });
 
+test('aggregate of packs with different voltages (16S JBD + 4S JK)', async () => {
+  const { page, done } = await openApp('?devices=jbd:Bat-48V,jk:Bat-12V');
+  await connectViaPicker(page);
+  await waitText(page, '#statusBar', 'Bat-48V · JBD');
+  await connectViaPicker(page);
+  await waitText(page, '#statusBar', 'Bat-12V · JK');
+  await waitText(page, '#capRemUnit', 'Ah');
+  await page.click('#batBar .bat-chip >> nth=0');
+  await waitText(page, '#statusBar', '2 из 2 на связи');
+  // 53.2 V × −12.34 A + 13.206 V × −5 A = −722.5 W (not avg V × ΣI = 33.2 V × −17.34 A ≈ −576 W)
+  await waitText(page, '#powerVal', '723');
+  assert.equal(await text(page, '#voltVal'), '—');
+  assert.equal(await text(page, '#ampVal'), '—');
+  assert.equal(await text(page, '#capRemVal'), '5.26');
+  assert.equal(await text(page, '#capRemUnit'), 'kWh');
+  assert.equal(await text(page, '#capFullSub'), 'из 6.64 kWh');
+  assert.equal(await text(page, '#socVal'), '79');
+  assert.equal(await text(page, '#flowText'), 'Разряд');
+  assert.equal(await text(page, '#etaVal'), '7 ч 16 м');
+  await page.click('#tab-session-btn');
+  await waitText(page, '#sesPeakDis', '723 W');
+  assert.equal(await text(page, '#sesPackV'), '—');
+  await page.click('#tab-details-btn');
+  assert.equal(await text(page, '#detCap'), '6.64 kWh');
+  await page.click('#batBar .bat-chip >> nth=2');
+  await waitText(page, '#capRemUnit', 'Ah');
+  assert.equal(await text(page, '#capRemVal'), '76.00');
+  await done();
+});
+
 test('session counters: single battery and all batteries', async () => {
   const { page, done } = await openApp('?devices=jbd:Bat-A,jbd:Bat-B');
   await page.click('#btn-close-picker');
