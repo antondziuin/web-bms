@@ -27,7 +27,7 @@
 - **Live dashboard** — SOC ring, power, charging / discharging / idle, time to full or empty
 - **Pack details** — voltage, current, remaining and full capacity, cell imbalance, temperatures (T1 / T2 / MOS), cycles, balancing, BMS errors
 - **Cells** — up to 32 cell voltages with a min / avg / max summary; the lowest and highest cells are highlighted
-- **Multiple batteries at once** — battery switcher and an “All” view for parallel packs: summed current, power and capacity, capacity-weighted SOC, an overview card per battery; every connected battery reconnects automatically next time
+- **Multiple batteries at once** — battery switcher and an “All” view: total power and energy (packs of different voltages, e.g. 4S next to 14S, add up correctly), energy-weighted SOC and time estimate, summed current and Ah for parallel packs, an overview card per battery; every connected battery reconnects automatically next time
 - **Session counters** — charged / discharged (Ah, Wh), net, peak charge and discharge, pack and cell voltage extremes, SOC at start and now, max temperature and imbalance
 - **Charts** — power, current, voltage and SOC for the last 1000 samples, with a hover / tap tooltip
 - **BMS memory** — reads what the BMS itself stores: the **JK event log** (boots, protections and their release, MOSFET switching — last 50 entries, dated from the BMS run time) and the **JBD protection counters** (short circuit, over/undervoltage, overcurrent, temperature); CSV export

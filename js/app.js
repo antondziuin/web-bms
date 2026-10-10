@@ -48,8 +48,12 @@ function currentView(){
   const bat = findBattery(selectedId) || batteries[0];
   return bat ? { bat } : { none:true };
 }
+function isFresh(bat, now){ return bat.connected && bat.state.lastSummaryTs && now - bat.state.lastSummaryTs < STALE_AFTER_MS; }
 function aggregateView(){
-  const agg = aggregateStates(batteries.map(b => b.state));
+  const now = Date.now();
+  // why: без связи батарея сохраняет SOC/энергию, но её последний ток не должен считаться; если на связи никого — показываем последнее известное
+  const fresh = new Set(batteries.filter(b => isFresh(b, now)).map(b => b.state));
+  const agg = aggregateStates(batteries.map(b => b.state), fresh.size ? s => fresh.has(s) : undefined);
   const errs = batteries.filter(b => b.state.errors && b.state.errors.toUpperCase() !== 'OK').map(b => `${devName(b.device)}: ${b.state.errors}`);
   agg.errors = errs.length ? errs.join('; ') : 'OK';
   return agg;
@@ -79,11 +83,12 @@ function onBatteryData(bat, p){
 /* Samples the aggregate once a second for the "All" chart and system-level session peaks. */
 function sampleAggregate(){
   const now = Date.now();
-  const live = batteries.filter(b => b.connected && b.state.lastSummaryTs && now - b.state.lastSummaryTs < STALE_AFTER_MS);
+  const live = batteries.filter(b => isFresh(b, now));
   if (!live.length) return;
   const agg = aggregateStates(live.map(b => b.state));
-  pushPoint(allPoints, { t:now, w:powerW(agg), i:agg.current, v:agg.totalV, soc:agg.soc });
-  sessionAddSummary(allSession, { v:agg.totalV, i:agg.current, soc:agg.soc, temps:[agg.temp1, agg.temp2, agg.tmos] }, now);
+  const w = powerW(agg);
+  pushPoint(allPoints, { t:now, w, i:agg.current, v:agg.totalV, soc:agg.soc });
+  sessionAddSummary(allSession, { v:agg.totalV, i:agg.current, w, soc:agg.soc, temps:[agg.temp1, agg.temp2, agg.tmos] }, now);
 }
 
 /* Remembered devices (auto-connect on load). null = never stored (legacy single-device key may exist). */
@@ -225,7 +230,7 @@ const hud = {
   power: $('#powerVal'), volt: $('#voltVal'), amp: $('#ampVal'),
   soc: $('#socVal'), socGauge: $('#socGauge'), socArc: $('#socArc'),
   flow: $('#flowState'), flowIcon: $('#flowIcon'), flowText: $('#flowText'),
-  capRem: $('#capRemVal'), capFull: $('#capFullSub'),
+  capRem: $('#capRemVal'), capRemUnit: $('#capRemUnit'), capFull: $('#capFullSub'),
   eta: $('#etaVal'), etaLabel: $('#etaLabel'),
   delta: $('#deltaVal'), deltaSub: $('#deltaSub'), deltaTile: $('#deltaTile'),
   temps: $('#tempsVal'), tempsSub: $('#tempsSub'), tempTile: $('#tempTile'),
@@ -288,7 +293,8 @@ function formatDuration(ms){
   return h ? `${h} ${t('unit.h')} ${String(m).padStart(2,'0')} ${t('unit.m')}` : `${m} ${t('unit.m')}`;
 }
 function formatAh(ah){ return `${ah.toFixed(Math.abs(ah) < 1 ? 3 : 2)} Ah`; }
-function formatWh(wh){ const a = Math.abs(wh); return a >= 1000 ? `${(wh/1000).toFixed(2)} kWh` : `${wh.toFixed(a < 10 ? 1 : 0)} Wh`; }
+function whParts(wh){ const a = Math.abs(wh); return a >= 1000 ? [(wh/1000).toFixed(2), 'kWh'] : [wh.toFixed(a < 10 ? 1 : 0), 'Wh']; }
+function formatWh(wh){ return whParts(wh).join(' '); }
 function agoText(ts, now){
   if (!ts) return '—';
   const s = Math.max(0, (now - ts)/1000);
@@ -410,7 +416,7 @@ function renderBatBar(v){
   if (batBar.hidden) return;
   const ids = [ALL, ...batteries.map(b=>b.id)];
   for (const [id, el] of batChips) if (!ids.includes(id)){ el.remove(); batChips.delete(id); }
-  const agg = aggregateStates(batteries.map(b=>b.state));
+  const agg = aggregateView();
   for (const id of ids){
     const el = batChips.get(id) || makeChip(id);
     batBar.appendChild(el);
@@ -448,9 +454,16 @@ function renderHud(s){
   hud.power.textContent = isNum(w) ? Math.abs(w).toFixed(Math.abs(w)>=100?0:1) : '—';
   hud.volt.textContent  = num(v, 2);
   hud.amp.textContent   = num(i, 2);
-  hud.capRem.textContent= num(s.capRem, 2);
   const full = estimateFullCapacityAh(s);
-  hud.capFull.textContent = isNum(full) ? t('tile.capOf', {cap:full.toFixed(full>=100?0:1)}) + (isNum(s.capFull)?'':' '+t('cap.estimate')) : ' ';
+  if (!isNum(s.capRem) && isNum(s.energyRemWh)){
+    // "All" with packs of different voltages: Ah do not add up, energy does
+    const [val, unit] = whParts(s.energyRemWh);
+    hud.capRem.textContent = val; hud.capRemUnit.textContent = unit;
+    hud.capFull.textContent = isNum(s.energyFullWh) ? t('tile.capOf', {cap:formatWh(s.energyFullWh)}) : ' ';
+  } else {
+    hud.capRem.textContent = num(s.capRem, 2); hud.capRemUnit.textContent = 'Ah';
+    hud.capFull.textContent = isNum(full) ? t('tile.capOf', {cap:`${full.toFixed(full>=100?0:1)} Ah`}) + (isNum(s.capFull)?'':' '+t('cap.estimate')) : ' ';
+  }
 
   // SOC gauge
   const soc = s.soc;
@@ -552,8 +565,10 @@ function renderSession(v){
   ses.ahNet.textContent = (netAh >= 0 ? '+' : '−') + formatAh(Math.abs(netAh));
   ses.whNet.textContent = (netWh >= 0 ? '+' : '−') + formatWh(Math.abs(netWh));
   ses.duration.textContent = formatDuration(Date.now() - s.start);
-  ses.peakChg.textContent = s.peakChgA > 0 ? `${s.peakChgW.toFixed(0)} W · ${s.peakChgA.toFixed(1)} A` : '—';
-  ses.peakDis.textContent = s.peakDisA > 0 ? `${s.peakDisW.toFixed(0)} W · ${s.peakDisA.toFixed(1)} A` : '—';
+  // why: у батарей разного напряжения суммарного тока нет — пик тогда только в ваттах
+  const peak = (w, a) => [w > 0 && `${w.toFixed(0)} W`, a > 0 && `${a.toFixed(1)} A`].filter(Boolean).join(' · ') || '—';
+  ses.peakChg.textContent = peak(s.peakChgW, s.peakChgA);
+  ses.peakDis.textContent = peak(s.peakDisW, s.peakDisA);
   ses.packV.textContent = isNum(s.vMin) ? `${s.vMin.toFixed(2)} / ${s.vMax.toFixed(2)} V` : '—';
   ses.soc.textContent = isNum(s.socStart) ? `${s.socStart.toFixed(0)}% → ${s.socNow.toFixed(0)}%` : '—';
   const minLabel = s.cellMinLabel ?? `#${s.cellMinIdx+1}`, maxLabel = s.cellMaxLabel ?? `#${s.cellMaxIdx+1}`;
@@ -586,7 +601,7 @@ function renderDetails(v){
     det.name.textContent = t('det.allName', { n: batteries.length });
     det.kind.textContent = [...new Set(batteries.map(b=>b.driver?.kind).filter(Boolean))].join(', ') || '—';
     det.model.textContent = '—';
-    det.cap.textContent = isNum(agg.capFull) ? `${agg.capFull.toFixed(1)} Ah` : '—';
+    det.cap.textContent = isNum(agg.capFull) ? `${agg.capFull.toFixed(1)} Ah` : isNum(agg.energyFullWh) ? formatWh(agg.energyFullWh) : '—';
     det.fresh.textContent = agg.lastSummaryTs ? t('det.fresh', {pack:agoText(agg.lastSummaryTs, now), cells:agoText(agg.lastCellsTs, now)}) : '—';
     det.disconnect.hidden = false;
     det.disconnect.textContent = t('det.disconnectAll');
