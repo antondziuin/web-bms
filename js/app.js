@@ -7,6 +7,7 @@ import { MAX_CELLS, CHG, createState, applyUpdate, powerW, activeCells, maxTemp,
 import { createSession, sessionAddSummary, sessionAddCells } from './session.js';
 import { createChart, METRICS } from './chart.js';
 import { initOffline } from './offline.js';
+import { initCounter } from './counter.js';
 import { createLog } from './log.js';
 import { createBmsMemory } from './bmsmemory.js';
 
@@ -816,6 +817,7 @@ setChartMetric(METRICS[storageGet(STORAGE_KEYS.metric, 'w')] ? storageGet(STORAG
 setTab(storageGet(STORAGE_KEYS.tab, 'cells'));
 requestAnimationFrame(chart.resize);
 initOffline();
+initCounter();
 
 setInterval(()=>{
   sampleAggregate();
