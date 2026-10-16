@@ -3,7 +3,7 @@
 import { storageGet, storageSet } from './util.js';
 
 const STORAGE_KEY = 'ui:lang';
-export const LANG_NAMES = { en:'English', ru:'Русский', uk:'Українська' };
+export const LANG_NAMES = { en:'English', uk:'Українська', ru:'Русский' };
 const LANG_ALIASES = { be:'ru', kk:'ru', ky:'ru' }; // why: русскоязычным пользователям этих локалей привычнее ru, чем en
 export const I18N = {
   en: {

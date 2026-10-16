@@ -12,7 +12,7 @@ const MOCK = fs.readFileSync(path.join(ROOT, 'tests/fixtures/frames.mjs'), 'utf8
 const START = new Date('2026-10-02T14:20:00');
 const HIDE_OFFLINE_BANNER = "try{ localStorage.setItem('ui:offline', '0'); }catch{}";
 
-const LANGS = { en: 'en-US', ru: 'ru-RU' };
+const LANGS = { en: 'en-US', uk: 'uk-UA', ru: 'ru-RU' };
 const PHONE = { width: 390, height: 844 };
 const DESKTOP = { width: 1280, height: 680 };
 
