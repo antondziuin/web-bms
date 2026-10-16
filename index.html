@@ -37,6 +37,18 @@
 
     <nav class="batbar" id="batBar" hidden aria-label="Батареи"></nav>
 
+    <!-- Shown when the browser has no Web Bluetooth (e.g. any browser on iPhone / iPad) -->
+    <div class="card banner" id="btBanner" hidden>
+      <div class="banner-icon"><svg><use href="#i-bt"/></svg></div>
+      <div class="banner-body">
+        <div class="banner-title" id="btBannerTitle"></div>
+        <div class="banner-text" id="btHint"></div>
+        <div class="banner-actions" id="btHintActions" hidden>
+          <a class="btn btn-primary btn-sm" id="btHintLink" href="https://apps.apple.com/app/bluefy-web-ble-browser/id1492822055" target="_blank" rel="noopener" data-i18n="bt.iosLink">Bluefy в App Store</a>
+        </div>
+      </div>
+    </div>
+
     <div class="card banner" id="offlineBanner" hidden>
       <div class="banner-icon"><svg><use href="#i-offline"/></svg></div>
       <div class="banner-body">

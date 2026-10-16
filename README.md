@@ -57,13 +57,19 @@
 
 ## Getting started
 
-1. Open **https://antondziuin.github.io/web-bms/** in **Chrome** or **Edge** (desktop or Android).
+1. Open **https://antondziuin.github.io/web-bms/** in **Chrome** or **Edge** (Windows, Mac or Android; for iPhone and iPad see [below](#iphone-ipad-and-mac)).
 2. Press **Connect** → **Choose device…** and pick your BMS in the system dialog. If a PIN is requested, it is usually `123456`.
 3. To watch several packs, press **Add** and pick the next BMS; the **All** chip shows them combined.
 4. To use the app without internet, accept the **Work offline** suggestion (or turn it on later in *Details → Settings*).
 5. **Log** tab: **Read from BMS** shows the log / counters stored in the BMS; below is the log this browser records while a BMS is connected.
 
-Firefox and Safari do not support Web Bluetooth; on iOS the [Bluefy](https://apps.apple.com/app/bluefy-web-ble-browser/id1492822055) browser can be used. Web Bluetooth needs HTTPS or `http://localhost`.
+Firefox does not support Web Bluetooth. Web Bluetooth needs HTTPS or `http://localhost`.
+
+### iPhone, iPad and Mac
+
+- **iPhone and iPad.** Apple does not support Web Bluetooth: Safari, and also Chrome, Edge and Firefox for iOS (they all run on the Safari engine), cannot connect to a BMS. Use the [Bluefy](https://apps.apple.com/app/bluefy-web-ble-browser/id1492822055) browser from the App Store: open **https://antondziuin.github.io/web-bms/** in it and press **Connect**. If the page is opened in Safari, the app shows this hint with a link to Bluefy.
+- **Limits on iPhone and iPad.** iOS pauses the page when the screen turns off or you switch to another app, so the link to the BMS drops: keep Bluefy open on the screen. Bluefy supports less than Chrome: if it cannot list recent devices, pick the BMS in the list each time.
+- **Mac.** Chrome and Edge on macOS support Web Bluetooth; Safari does not. On the first connection macOS asks to allow Bluetooth for the browser; if it was denied, turn it on in *System Settings → Privacy & Security → Bluetooth*.
 
 ## Development
 

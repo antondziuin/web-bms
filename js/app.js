@@ -1,5 +1,5 @@
 /* Battery monitor app: multi-battery connection manager, rendering, picker, settings. */
-import { isNum, clamp, map, fmt, num, errMsg, storageGet, storageSet, storageGetJson, storageSetJson, withTimeout, hhmmss, ago } from './util.js';
+import { isNum, clamp, map, fmt, num, errMsg, isAppleMobile, storageGet, storageSet, storageGetJson, storageSetJson, withTimeout, hhmmss, ago } from './util.js';
 import { t, applyStaticI18n, detectLang, getLangPref, setLangPref, refreshAutoLang, LANG_NAMES } from './i18n.js';
 import { UUID } from './protocols.js';
 import { createDriver, waitForAdvertisement } from './ble.js';
@@ -834,7 +834,17 @@ setInterval(()=>{
 if (!('bluetooth' in navigator)){
   btnBtEl.setAttribute('disabled','');
   $('#cellsConnect').setAttribute('disabled','');
-  globalStatus = { key: window.isSecureContext ? 'status.unsupported' : 'status.needHttps', tone:'error', params:null };
+  const ios = isAppleMobile();
+  globalStatus = { key: !window.isSecureContext ? 'status.needHttps' : ios ? 'status.unsupportedIos' : 'status.unsupported', tone:'error', params:null };
+  if (window.isSecureContext){
+    // why: на iPhone/iPad не поможет ни Chrome, ни Edge — там нужен отдельный браузер с Web Bluetooth
+    $('#btBannerTitle').dataset.i18n = globalStatus.key;
+    $('#btHint').dataset.i18n = ios ? 'bt.iosHint' : 'bt.otherHint';
+    $('#btHintActions').hidden = !ios;
+    $('#btBanner').hidden = false;
+    $('#cellsConnect').hidden = true;
+    applyStaticI18n();
+  }
   render();
 } else if (document.readyState === 'complete'){
   autoConnectOnLoad().catch(()=>{});

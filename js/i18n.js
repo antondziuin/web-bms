@@ -142,6 +142,10 @@ export const I18N = {
     'bset.cycleCap':'Cycle capacity',
     'bset.chgSwitch':'Charging allowed',
     'bset.dsgSwitch':'Discharging allowed',
+    'status.unsupportedIos':'No Web Bluetooth on iPhone / iPad',
+    'bt.iosHint':'Safari and the other browsers on iPhone and iPad cannot connect to Bluetooth devices. Install the Bluefy browser and open this page in it.',
+    'bt.iosLink':'Bluefy in the App Store',
+    'bt.otherHint':'This browser cannot connect to Bluetooth devices. Open the page in Chrome or Edge on Windows, Mac or Android.',
   },
   ru: {
     'meta.description':'Монитор BMS JK / JBD через Web Bluetooth: напряжение, ток, SOC, ячейки, графики.',
@@ -279,6 +283,10 @@ export const I18N = {
     'bset.cycleCap':'Ёмкость цикла',
     'bset.chgSwitch':'Заряд разрешён',
     'bset.dsgSwitch':'Разряд разрешён',
+    'status.unsupportedIos':'Нет Web Bluetooth на iPhone / iPad',
+    'bt.iosHint':'Safari и другие браузеры на iPhone и iPad не умеют подключаться к Bluetooth-устройствам. Установите браузер Bluefy и откройте эту страницу в нём.',
+    'bt.iosLink':'Bluefy в App Store',
+    'bt.otherHint':'Этот браузер не умеет подключаться к Bluetooth-устройствам. Откройте страницу в Chrome или Edge на Windows, Mac или Android.',
   },
   uk: {
     'meta.description':'Монітор BMS JK / JBD через Web Bluetooth: напруга, струм, SOC, комірки, графіки.',
@@ -416,6 +424,10 @@ export const I18N = {
     'bset.cycleCap':'Ємність циклу',
     'bset.chgSwitch':'Заряд дозволено',
     'bset.dsgSwitch':'Розряд дозволено',
+    'status.unsupportedIos':'Немає Web Bluetooth на iPhone / iPad',
+    'bt.iosHint':'Safari та інші браузери на iPhone і iPad не вміють підключатися до Bluetooth-пристроїв. Встановіть браузер Bluefy і відкрийте цю сторінку в ньому.',
+    'bt.iosLink':'Bluefy в App Store',
+    'bt.otherHint':'Цей браузер не вміє підключатися до Bluetooth-пристроїв. Відкрийте сторінку в Chrome або Edge на Windows, Mac чи Android.',
   },
 };
 

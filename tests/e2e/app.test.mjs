@@ -333,5 +333,36 @@ test('browser without Web Bluetooth', async () => {
   const { page: p, done } = await openApp('?nobt=1');
   await waitText(p, '#statusBar', 'Web Bluetooth не поддерживается — нужен Chrome / Edge');
   assert.equal(await p.$eval('#btn-bt', b => b.disabled), true);
+  assert.match(await text(p, '#btHint'), /Откройте страницу в Chrome или Edge/);
+  assert.equal(await text(p, '#btBannerTitle'), 'Web Bluetooth не поддерживается — нужен Chrome / Edge');
+  assert.equal(await visible(p, '#btHintLink'), false, 'no App Store link outside iPhone / iPad');
+  assert.equal(await visible(p, '#cellsConnect'), false);
   await done();
+});
+
+test('iPhone and iPad: points to a browser with Web Bluetooth', async () => {
+  const devices = {
+    iPhone: { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1' },
+    // iPadOS asks for desktop sites and reports itself as a Mac; the touch screen gives it away
+    iPad: { userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15', touch: true },
+  };
+  for (const [name, d] of Object.entries(devices)){
+    const context = await browser.newContext({ locale: 'uk-UA', viewport: { width: 390, height: 844 }, userAgent: d.userAgent, hasTouch: !!d.touch });
+    if (d.touch) await context.addInitScript(() => {
+      Object.defineProperty(Object.getPrototypeOf(navigator), 'platform', { get: () => 'MacIntel' });
+      Object.defineProperty(Object.getPrototypeOf(navigator), 'maxTouchPoints', { get: () => 5 });
+    });
+    const { page: p, done } = await openApp('?nobt=1', { context });
+    await waitText(p, '#statusBar', 'Немає Web Bluetooth на iPhone / iPad');
+    assert.equal(await visible(p, '#btBanner'), true, name);
+    assert.equal(await text(p, '#btBannerTitle'), 'Немає Web Bluetooth на iPhone / iPad');
+    assert.match(await text(p, '#btHint'), /Встановіть браузер Bluefy/, name);
+    assert.equal(await p.getAttribute('#btHintLink', 'href'), 'https://apps.apple.com/app/bluefy-web-ble-browser/id1492822055');
+    assert.equal(await visible(p, '#btHintLink'), true, name);
+    // the hint follows a language switch
+    await p.click('#tab-details-btn');
+    await p.selectOption('#langSelect', 'en');
+    assert.match(await text(p, '#btHint'), /Install the Bluefy browser/);
+    await done();
+  }
 });

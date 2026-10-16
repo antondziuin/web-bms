@@ -9,6 +9,11 @@ export function map(x,inMin,inMax,outMin,outMax){
 }
 export function fmt(v,u,d){ return isNum(v)? `${v.toFixed(d)} ${u}` : `– ${u}`; }
 export function num(v,d){ return isNum(v) ? v.toFixed(d) : '—'; }
+/* iPhone / iPad: every browser there is WebKit without Web Bluetooth. iPadOS reports itself as a Mac,
+   so it is told apart by the touch screen. */
+export function isAppleMobile(nav = navigator){
+  return /iPhone|iPad|iPod/.test(nav.userAgent || '') || (nav.platform === 'MacIntel' && nav.maxTouchPoints > 1);
+}
 export function errMsg(err){ return (err && (err.message || err.name)) || String(err); }
 export function storageGet(key, def){ try{ const v = localStorage.getItem(key); return v===null ? def : v; }catch{ return def; } }
 export function storageSet(key, val){ try{ localStorage.setItem(key, val); }catch{} }
