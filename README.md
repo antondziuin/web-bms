@@ -10,7 +10,7 @@
 <p align="center">
   <a href="https://antondziuin.github.io/web-bms/"><b>Open the app →</b></a>
   &nbsp;·&nbsp;
-  <b>English</b> · <a href="README.ru.md">Русский</a>
+  <b>English</b> · <a href="README.uk.md">Українська</a> · <a href="README.ru.md">Русский</a>
 </p>
 
 <p align="center">
@@ -35,7 +35,7 @@
 - **Works offline** (opt-in) — the app offers to save itself on the device, then opens without a network and can be installed to the home screen
 - **Reliable link** — automatic reconnection when the Bluetooth link drops; optional “keep screen on”
 - **Light and dark themes**, responsive layout from 320 px phones to desktops
-- **English, Russian and Ukrainian** UI, picked from the browser language (can be changed in *Details*)
+- **English, Ukrainian and Russian** UI, picked from the browser language (can be changed in *Details*)
 
 ## Screenshots
 
