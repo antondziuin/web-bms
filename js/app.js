@@ -10,6 +10,7 @@ import { initOffline } from './offline.js';
 import { initCounter } from './counter.js';
 import { createLog } from './log.js';
 import { createBmsMemory } from './bmsmemory.js';
+import { createBmsSettings } from './bmssettings.js';
 
 /* ================= Config ================= */
 const RECONNECT_MAX_ATTEMPTS = 8;
@@ -276,6 +277,7 @@ for (const b of chartMetricBtns) b.addEventListener('click', ()=>setChartMetric(
 /* ================= Log (browser) and BMS memory ================= */
 const log = createLog({ getBatteries: () => batteries, getSelectedId: () => currentView().bat?.id ?? null });
 const bmsMemory = createBmsMemory({ getView: currentView });
+const bmsSettings = createBmsSettings({ getView: currentView });
 
 /* ================= Formatting ================= */
 function formatEtaHours(hrs){
@@ -682,7 +684,7 @@ function render(){
   if (activeTab === 'chart') chart.draw();
   if (activeTab === 'session') renderSession(v);
   if (activeTab === 'log') bmsMemory.render();
-  if (activeTab === 'details') renderDetails(v);
+  if (activeTab === 'details'){ renderDetails(v); bmsSettings.render(); }
 }
 
 /* ================= Screen Wake Lock ================= */

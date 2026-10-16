@@ -92,6 +92,35 @@ export function parseJkSettings(d){
   return {
     cfgUvpMv: okU?uvp:NaN, cfgOvpMv: okO?ovp:NaN,
     cfgSoc0mV: okS?soc0:NaN, cfgSoc100mV: okS?soc100:NaN,
+    // why: у старых JK кадр настроек другой раскладки — тогда UVP/OVP не проходят проверку и остальное не читаем
+    bmsSettings: okU && okO && d.length >= 142 ? decodeJkSettings(d) : undefined,
+  };
+}
+
+/* ---------- BMS settings (read-only view) ----------
+   One normalized object for both BMS kinds; a field is NaN / undefined when the BMS does not report it
+   or the value is out of a sane range. Units: cell mV, pack V, A, °C, s, µs, Ah; switches are booleans. */
+const inRange = (v, lo, hi) => isNum(v) && v >= lo && v <= hi ? v : NaN;
+const cellMv = v => inRange(v, 1000, 5000);
+const tempC = v => inRange(v, -60, 150);
+const flag = b => b === 0 || b === 1 ? b === 1 : undefined;
+
+/* JK02 settings frame (type 0x01): u32 little-endian fields; layout follows syssi/esphome-jk-bms. */
+export function decodeJkSettings(d){
+  const u = i => jk.u32(d, i), s = i => jk.s32(d, i);
+  const amps = i => inRange(u(i) * 0.001, 0.001, 1000);
+  const secs = i => inRange(u(i), 0, 100000);
+  return {
+    cellUvp: cellMv(u(10)), cellUvpRel: cellMv(u(14)), cellOvp: cellMv(u(18)), cellOvpRel: cellMv(u(22)),
+    balTrigger: inRange(u(26), 1, 1000), soc100: cellMv(u(30)), soc0: cellMv(u(34)),
+    rcv: cellMv(u(38)), rfv: cellMv(u(42)), powerOff: cellMv(u(46)),
+    chgOc: amps(50), chgOcDelay: secs(54), chgOcRec: secs(58),
+    dsgOc: amps(62), dsgOcDelay: secs(66), dsgOcRec: secs(70),
+    scpRec: secs(74), balMaxCurrent: inRange(u(78) * 0.001, 0.001, 50),
+    chgOt: tempC(s(82) * 0.1), chgOtRel: tempC(s(86) * 0.1), dsgOt: tempC(s(90) * 0.1), dsgOtRel: tempC(s(94) * 0.1),
+    chgUt: tempC(s(98) * 0.1), chgUtRel: tempC(s(102) * 0.1), mosOt: tempC(s(106) * 0.1), mosOtRel: tempC(s(110) * 0.1),
+    cellCount: inRange(u(114), 1, 32), chgSwitch: flag(d[118]), dsgSwitch: flag(d[122]), balSwitch: flag(d[126]),
+    designCap: inRange(u(130) * 0.001, 0.001, 10000), scpDelay: inRange(u(134), 1, 1000000), balStart: cellMv(u(138)),
   };
 }
 
@@ -186,6 +215,7 @@ export function parseJbdFrame(frame){
   const fn = frame[1], status = frame[2], len = frame[3];
   const data = frame.slice(4, 4 + len);
   if (fn === 0xAA) return status === 0x00 ? { jbdCounters: parseJbdCounters(data) } : { jbdCountersError: status };
+  if (JBD_SETTINGS_REGS.includes(fn)) return { jbdReg: fn, data: status === 0x00 ? data : null };
   if (status !== 0x00) return null;
   if (fn === 0x03) return parseJbdHwInfo(data);
   if (fn === 0x04) return parseJbdCells(data);
@@ -342,4 +372,29 @@ export function parseJbdCounters(d){
   const counts = [];
   for (let i = 0; i + 1 < d.length; i += 2) counts.push(jbd.u16(d, i));
   return counts;
+}
+
+/* ---------- JBD settings (EEPROM registers, readable only in factory mode) ----------
+   Each register is a u16 big-endian answer to a plain read (DD A5 reg 00 …). Register map as in
+   the JBD communication protocol and sshoecraft/jbdtool. */
+export const JBD_SETTINGS_REGS = [0x10, 0x11, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F,
+  0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2A, 0x2B, 0x2D, 0x2F];
+/* regs: { [register]: byte array }; missing registers give NaN / undefined. */
+export function decodeJbdSettings(regs){
+  const u = r => regs[r]?.length >= 2 ? jbd.u16(regs[r], 0) : NaN;
+  const kelvin = r => tempC((u(r) - 2731) * 0.1);
+  const packV = r => inRange(u(r) * 0.01, 1, 200);
+  const func = u(0x2D), dsg = u(0x29);
+  return {
+    designCap: inRange(u(0x10) * 0.01, 0.01, 10000), cycleCap: inRange(u(0x11) * 0.01, 0.01, 10000),
+    chgOt: kelvin(0x18), chgOtRel: kelvin(0x19), chgUt: kelvin(0x1A), chgUtRel: kelvin(0x1B),
+    dsgOt: kelvin(0x1C), dsgOtRel: kelvin(0x1D), dsgUt: kelvin(0x1E), dsgUtRel: kelvin(0x1F),
+    packOvp: packV(0x20), packOvpRel: packV(0x21), packUvp: packV(0x22), packUvpRel: packV(0x23),
+    cellOvp: cellMv(u(0x24)), cellOvpRel: cellMv(u(0x25)), cellUvp: cellMv(u(0x26)), cellUvpRel: cellMv(u(0x27)),
+    // why: ток разряда хранится со знаком «минус», показываем модуль
+    chgOc: inRange(u(0x28) * 0.01, 0.01, 1000), dsgOc: inRange((dsg & 0x8000 ? 0x10000 - dsg : dsg) * 0.01, 0.01, 1000),
+    balStart: cellMv(u(0x2A)), balTrigger: inRange(u(0x2B), 1, 1000),
+    balSwitch: isNum(func) ? !!(func & 0x04) : undefined, balChgOnly: isNum(func) ? !!(func & 0x08) : undefined,
+    cellCount: inRange(u(0x2F), 1, 32),
+  };
 }

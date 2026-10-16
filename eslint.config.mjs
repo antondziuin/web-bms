@@ -9,6 +9,7 @@ export default [
   { files: ['js/**/*.js'], languageOptions: { ecmaVersion: 2023, sourceType: 'module', globals: browser }, rules },
   { files: ['sw.js'], languageOptions: { ecmaVersion: 2023, sourceType: 'script', globals: { self: 'readonly', caches: 'readonly', fetch: 'readonly', URL: 'readonly', AbortController: 'readonly', setTimeout: 'readonly', clearTimeout: 'readonly' } }, rules },
   { files: ['tests/e2e/mock-bluetooth.js', 'tests/e2e/layout-audit.js'], languageOptions: { ecmaVersion: 2023, sourceType: 'script',
-    globals: { ...browser, chunks: 'readonly', jbdHwInfo: 'readonly', jbdCells: 'readonly', jk02: 'readonly', jbdCounters: 'readonly', jbdWriteAck: 'readonly', jkDeviceInfo: 'readonly', jkLogbook: 'readonly' } }, rules },
+    globals: { ...browser, chunks: 'readonly', jbdHwInfo: 'readonly', jbdCells: 'readonly', jk02: 'readonly', jbdCounters: 'readonly', jbdWriteAck: 'readonly', jkDeviceInfo: 'readonly', jkLogbook: 'readonly',
+      jkSettings: 'readonly', jbdFrame: 'readonly', jbdRegister: 'readonly', JBD_SETTINGS: 'readonly' } }, rules },
   { files: ['**/*.mjs'], languageOptions: { ecmaVersion: 2023, sourceType: 'module', globals: { ...node, ...browser } }, rules },
 ];

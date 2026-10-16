@@ -67,11 +67,13 @@
         if (f[2] === 0x04) notify.emit(jbdCells(preset.cells));
         // why: строгая прошивка отдаёт счётчики только в заводском режиме — проверяем этот путь
         if (f[2] === 0xAA) notify.emit(factory ? jbdCounters(preset.counters || []) : jbdCounters([], 0x80));
+        // EEPROM settings answer only in factory mode; otherwise the BMS rejects the read
+        if (f[2] in JBD_SETTINGS) notify.emit(factory ? jbdRegister(f[2], JBD_SETTINGS[f[2]]) : jbdFrame(f[2], [], 0x80));
       });
     } else {
       notify = ctrl = new Chr(f => {
         if (!dev.gatt.connected) return;
-        if (f[4] === 0x96) notify.emit(jk02(wave ? { ...preset.frame, currentMa: liveHw({ i: -5000 }, phase).i } : preset.frame));
+        if (f[4] === 0x96){ notify.emit(jkSettings({ full: true })); notify.emit(jk02(wave ? { ...preset.frame, currentMa: liveHw({ i: -5000 }, phase).i } : preset.frame)); }
         if (f[4] === 0x97) notify.emit(jkDeviceInfo({ uptime: preset.uptime }));
         if (f[4] === 0xA1) notify.emit(jkLogbook(preset.logbook));
       });

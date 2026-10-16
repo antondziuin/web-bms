@@ -26,6 +26,11 @@ export function jbdCells(mv){ const d = []; for (const v of mv) d.push(...be16(v
 export function jbdVersion(text){ return jbdFrame(0x05, [...text].map(c => c.charCodeAt(0))); }
 /* Protection counters (0xAA): u16 big-endian each; status 0x80 = rejected (not in factory mode). */
 export function jbdCounters(counts, status = 0){ const d = []; for (const n of counts) d.push(...be16(n)); return jbdFrame(0xAA, status ? [] : d, status); }
+/* EEPROM settings registers (factory mode), u16 each: a 16S LFP pack, 100 Ah. */
+export const JBD_SETTINGS = { 0x10: 10000, 0x11: 9000, 0x18: 2731 + 550, 0x19: 2731 + 500, 0x1A: 2731, 0x1B: 2731 + 50,
+  0x1C: 2731 + 600, 0x1D: 2731 + 550, 0x1E: 2731 - 200, 0x1F: 2731 - 100, 0x20: 5840, 0x21: 5600, 0x22: 4000, 0x23: 4320,
+  0x24: 3650, 0x25: 3500, 0x26: 2500, 0x27: 2700, 0x28: 5000, 0x29: 0x10000 - 10000, 0x2A: 3400, 0x2B: 30, 0x2D: 0x0C, 0x2F: 16 };
+export function jbdRegister(reg, value){ return jbdFrame(reg, be16(value)); }
 /* Acknowledge of a register write (DD reg 00 00 crc 77). */
 export function jbdWriteAck(reg){ return jbdFrame(reg, []); }
 
@@ -55,10 +60,16 @@ export function jk02({ layout = 24, cells = [3300, 3301, 3302, 3303], totalMv, c
   f.splice(142 + off, 4, ...le32(remMah)); f.splice(146 + off, 4, ...le32(fullMah)); f.splice(150 + off, 4, ...le32(cycles));
   return jkSeal(f);
 }
-/* JK02 settings frame (type 0x01), mV. */
-export function jkSettings({ uvp = 2800, ovp = 3650, soc100 = 3450, soc0 = 2900 } = {}){
+/* JK02 settings frame (type 0x01): mV, mA, s, 0.1 °C, mAh, µs. full: also every other field (a JK B2A8S20P on LFP). */
+export function jkSettings({ uvp = 2800, ovp = 3650, soc100 = 3450, soc0 = 2900, full = false } = {}){
   const f = jkHeader(0x01);
   f.splice(10, 4, ...le32(uvp)); f.splice(18, 4, ...le32(ovp)); f.splice(30, 4, ...le32(soc100)); f.splice(34, 4, ...le32(soc0));
+  if (full){
+    const u32 = { 14: 2900, 22: 3550, 26: 10, 46: 2600, 50: 100000, 54: 30, 58: 60, 62: 150000, 66: 300, 70: 60, 74: 5,
+      78: 2000, 82: 650, 86: 600, 90: 700, 94: 650, 98: -50, 102: 30, 106: 1000, 110: 800, 114: 8, 130: 280000, 134: 1500, 138: 3000 };
+    for (const [pos, v] of Object.entries(u32)) f.splice(+pos, 4, ...le32(v >>> 0));
+    f[118] = 1; f[122] = 1; f[126] = 1;
+  }
   return jkSeal(f);
 }
 /* JK device-info frame (type 0x03). */

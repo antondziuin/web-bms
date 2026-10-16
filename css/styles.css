@@ -310,6 +310,21 @@ dialog::backdrop{background:rgba(5,8,14,.6);backdrop-filter:blur(2px)}
 #memCounters:empty{display:none}
 #memCounters dd.hit{color:var(--warn)}
 
+/* BMS parameters (Details tab) */
+.bset,#bsetGroups{display:flex;flex-direction:column;gap:10px}
+.bset[hidden]{display:none}
+#bsetGroups:empty{display:none}
+.bset-title{font-size:13px;font-weight:600;margin-bottom:-4px}
+/* why: длинные подписи переносятся, а значение и пояснения под ним — нет, иначе на телефоне они ломаются по буквам */
+.bset-kv{grid-template-columns:minmax(0,1fr) auto}
+.bset-kv dd{white-space:nowrap}
+.bset-kv dd .rel{display:block;color:var(--faint);font-size:11px;font-weight:400}
+@media (max-width:380px){
+  .bset-kv{grid-template-columns:1fr}
+  .bset-kv dt{border-bottom:0;padding-bottom:0;font-size:12px}
+  .bset-kv dd{text-align:left;padding-top:2px}
+}
+
 /* Tab bar: labels keep their full width; on narrow screens the bar scrolls sideways */
 .tabbar{overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .tabbar::-webkit-scrollbar{display:none}

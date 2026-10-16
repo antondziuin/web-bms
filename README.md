@@ -31,6 +31,7 @@
 - **Session counters** — charged / discharged (Ah, Wh), net, peak charge and discharge, pack and cell voltage extremes, SOC at start and now, max temperature and imbalance
 - **Charts** — power, current, voltage and SOC for the last 1000 samples, with a hover / tap tooltip
 - **BMS memory** — reads what the BMS itself stores: the **JK event log** (boots, protections and their release, MOSFET switching — last 50 entries, dated from the BMS run time) and the **JBD protection counters** (short circuit, over/undervoltage, overcurrent, temperature); CSV export
+- **BMS parameters** (view only) — protection thresholds with their release values, delays, balancing and battery settings: JK sends them on connect, JBD settings are read from the BMS memory on request; nothing is written
 - **Log in the browser** — records every battery at a chosen interval (5 s – 1 min) and keeps 7 days on the device; view it on the page as a chart and a table, download CSV (Excel) or JSON, open a saved file later; optional raw BLE frame capture for troubleshooting
 - **Works offline** (opt-in) — the app offers to save itself on the device, then opens without a network and can be installed to the home screen
 - **Reliable link** — automatic reconnection when the Bluetooth link drops; optional “keep screen on”
@@ -98,6 +99,7 @@ npm run test:e2e   # the app in headless Chromium with a Bluetooth mock (Playwri
 | `js/model.js`, `js/session.js` | battery state, multi-battery aggregate, session counters |
 | `js/chart.js`, `js/i18n.js`, `js/offline.js` | chart, translations, offline mode |
 | `js/bmsmemory.js` | JK event log / JBD protection counters read from the BMS |
+| `js/bmssettings.js` | BMS parameters (protections, balancing), view only |
 | `js/log.js`, `js/logformat.js`, `js/logstore.js` | browser log: recording (IndexedDB), viewer, CSV / JSON |
 | `js/app.js` | battery manager and UI |
 | `sw.js` | service worker (registered only after the user opts in) |
