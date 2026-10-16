@@ -128,3 +128,44 @@ test('JBD register write frame and protection counters', () => {
   assert.deepEqual(parseJbdFrame(jbdCounters([], 0x80)), { jbdCountersError: 0x80 });
   assert.equal(JBD_PROTECTION_KEYS.length, 11);
 });
+
+import { decodeJbdSettings, JBD_SETTINGS_REGS } from '../../js/protocols.js';
+import { JBD_SETTINGS, jbdRegister } from '../fixtures/frames.mjs';
+
+test('JK settings frame: protections, balancing and switches for the BMS parameters view', () => {
+  const { bmsSettings: s } = parseJkFrame(jkSettings({ full: true }));
+  assert.deepEqual({ ovp: s.cellOvp, ovpRel: s.cellOvpRel, uvp: s.cellUvp, uvpRel: s.cellUvpRel, off: s.powerOff },
+    { ovp: 3650, ovpRel: 3550, uvp: 2800, uvpRel: 2900, off: 2600 });
+  assert.deepEqual([s.chgOc, s.chgOcDelay, s.chgOcRec, s.dsgOc, s.dsgOcDelay, s.dsgOcRec], [100, 30, 60, 150, 300, 60]);
+  assert.deepEqual([s.chgOt, s.chgOtRel, s.dsgOt, s.chgUt, s.chgUtRel, s.mosOt], [65, 60, 70, -5, 3, 100]);
+  assert.deepEqual([s.balStart, s.balTrigger, s.balMaxCurrent, s.balSwitch], [3000, 10, 2, true]);
+  assert.deepEqual([s.cellCount, s.designCap, s.scpDelay, s.scpRec, s.chgSwitch, s.dsgSwitch], [8, 280, 1500, 5, true, true]);
+  assert.ok(Number.isNaN(s.rcv) && Number.isNaN(s.rfv), 'fields the firmware leaves at 0 are not reported');
+  // only the four basic fields in the frame: protections are known, the rest is not reported
+  const basic = parseJkFrame(jkSettings()).bmsSettings;
+  assert.equal(basic.cellOvp, 3650);
+  assert.ok(Number.isNaN(basic.chgOc) && Number.isNaN(basic.designCap) && Number.isNaN(basic.cellCount));
+  assert.equal(basic.chgSwitch, false, 'a zero switch byte reads as off');
+  // a frame of another layout (UVP/OVP out of range) gives no parameters at all
+  assert.equal(parseJkFrame(jkSettings({ uvp: 0, ovp: 0 })).bmsSettings, undefined);
+});
+
+test('JBD settings registers: answers are routed by register and decoded', () => {
+  const regs = {};
+  for (const reg of JBD_SETTINGS_REGS){
+    const p = parseJbdFrame(jbdRegister(reg, JBD_SETTINGS[reg]));
+    assert.equal(p.jbdReg, reg);
+    regs[reg] = p.data;
+  }
+  assert.deepEqual(parseJbdFrame(jbdFrame(0x24, [], 0x80)), { jbdReg: 0x24, data: null }, 'rejected read outside factory mode');
+  const s = decodeJbdSettings(regs);
+  assert.deepEqual([s.designCap, s.cycleCap, s.cellCount], [100, 90, 16]);
+  assert.deepEqual([s.cellOvp, s.cellOvpRel, s.cellUvp, s.cellUvpRel], [3650, 3500, 2500, 2700]);
+  assert.deepEqual([s.packOvp, s.packOvpRel, s.packUvp, s.packUvpRel], [58.4, 56, 40, 43.2]);
+  assert.deepEqual([s.chgOc, s.dsgOc], [50, 100], 'discharge limit is stored negative');
+  assert.deepEqual([s.chgOt, s.chgOtRel, s.chgUt, s.chgUtRel, s.dsgOt, s.dsgUt].map(v => Math.round(v * 10) / 10), [55, 50, 0, 5, 60, -20]);
+  assert.deepEqual([s.balStart, s.balTrigger, s.balSwitch, s.balChgOnly], [3400, 30, true, true]);
+  const partial = decodeJbdSettings({ 0x24: regs[0x24] });
+  assert.equal(partial.cellOvp, 3650);
+  assert.ok(Number.isNaN(partial.chgOc) && partial.balSwitch === undefined, 'registers that did not answer stay unknown');
+});

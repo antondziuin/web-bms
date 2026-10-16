@@ -1,5 +1,5 @@
 /* BLE drivers: wrap a GATT server, stream parsed updates to onData. */
-import { UUID, jkBuildCmd, makeJkFramer, parseJkFrame, jbdBuildRead, jbdBuildWrite, makeJbdFramer, parseJbdFrame } from './protocols.js';
+import { UUID, jkBuildCmd, makeJkFramer, parseJkFrame, jbdBuildRead, jbdBuildWrite, makeJbdFramer, parseJbdFrame, JBD_SETTINGS_REGS, decodeJbdSettings } from './protocols.js';
 import { sleep, withTimeout } from './util.js';
 
 async function writeChr(chr, frame){
@@ -72,11 +72,12 @@ export async function makeJbd(server, onData, onRaw){
   const chrN = await svc.getCharacteristic(UUID.JBD_NOTIFY);
   const chrC = await svc.getCharacteristic(UUID.JBD_CTRL);
   const write = makeWriter(chrC);
-  let poll = null, tick = 0, paused = false, countersWaiter = null;
+  let poll = null, tick = 0, paused = false, countersWaiter = null, regWaiter = null;
   const framer = makeJbdFramer(frame=>{
     onRaw?.(frame);
     const p = parseJbdFrame(frame);
     if (p && ('jbdCounters' in p || 'jbdCountersError' in p)){ countersWaiter?.(p); countersWaiter = null; return; }
+    if (p && 'jbdReg' in p){ if (regWaiter?.reg === p.jbdReg){ regWaiter.resolve(p.data); regWaiter = null; } return; }
     if (p) onData(p);
   });
   function onNotify(ev){
@@ -104,23 +105,47 @@ export async function makeJbd(server, onData, onRaw){
     return withTimeout(new Promise(resolve => { countersWaiter = resolve; write(jbdBuildRead(0xAA)).catch(()=>{}); }), ms, 'No answer from the BMS')
       .catch(() => null).finally(() => { countersWaiter = null; });
   }
-  /* Protection counters (register 0xAA). Some firmware answers only in factory mode: then enter it,
-     read and leave it without saving (0x0000 → reg 0x01), so no setting is changed. */
-  async function readCounters(){
-    paused = true;
-    try{
+  function requestReg(reg, ms){
+    return withTimeout(new Promise(resolve => { regWaiter = { reg, resolve }; write(jbdBuildRead(reg)).catch(()=>{}); }), ms, 'No answer from the BMS')
+      .catch(() => null).finally(() => { regWaiter = null; });
+  }
+  /* Factory mode: enter (0x5678 → reg 0x00), run fn, leave without saving (0x0000 → reg 0x01),
+     so no setting is changed. Polling pauses meanwhile; one such read at a time. */
+  let exclusive = Promise.resolve();
+  function withPolling(fn){
+    const run = exclusive.then(async ()=>{ paused = true; try{ return await fn(); } finally{ paused = false; } });
+    exclusive = run.catch(()=>{});
+    return run;
+  }
+  async function inFactoryMode(fn){
+    await write(jbdBuildWrite(0x00, [0x56, 0x78]));
+    await sleep(250);
+    try{ return await fn(); }
+    finally{ await write(jbdBuildWrite(0x01, [0x00, 0x00])).catch(()=>{}); await sleep(150); }
+  }
+  /* Protection counters (register 0xAA). Some firmware answers only in factory mode. */
+  function readCounters(){
+    return withPolling(async ()=>{
       let r = await requestCounters(1500);
-      if (!r?.jbdCounters){
-        await write(jbdBuildWrite(0x00, [0x56, 0x78]));
-        await sleep(250);
-        try{ r = await requestCounters(2500); }
-        finally{ await write(jbdBuildWrite(0x01, [0x00, 0x00])).catch(()=>{}); await sleep(150); }
-      }
+      if (!r?.jbdCounters) r = await inFactoryMode(() => requestCounters(2500));
       if (!r?.jbdCounters) throw new Error('No answer from the BMS');
       return r.jbdCounters;
-    }finally{ paused = false; }
+    });
   }
-  return { kind:'JBD', start, stop, readCounters };
+  /* Protection and balancing settings (EEPROM registers), read-only. */
+  function readSettings(){
+    return withPolling(() => inFactoryMode(async ()=>{
+      const regs = {};
+      for (const reg of JBD_SETTINGS_REGS){
+        const data = await requestReg(reg, 1000);
+        if (data) regs[reg] = data;
+        else if (!Object.keys(regs).length) break; // why: молчит на первый регистр — не ждём остальные 23 таймаута
+      }
+      if (!Object.keys(regs).length) throw new Error('No answer from the BMS');
+      return decodeJbdSettings(regs);
+    }));
+  }
+  return { kind:'JBD', start, stop, readCounters, readSettings };
 }
 
 /* Picks the driver by the services the BMS exposes. Error carries a code for i18n.

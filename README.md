@@ -31,6 +31,7 @@
 - **Session counters** — charged / discharged (Ah, Wh), net, peak charge and discharge, pack and cell voltage extremes, SOC at start and now, max temperature and imbalance
 - **Charts** — power, current, voltage and SOC for the last 1000 samples, with a hover / tap tooltip
 - **BMS memory** — reads what the BMS itself stores: the **JK event log** (boots, protections and their release, MOSFET switching — last 50 entries, dated from the BMS run time) and the **JBD protection counters** (short circuit, over/undervoltage, overcurrent, temperature); CSV export
+- **BMS parameters** (view only) — protection thresholds with their release values, delays, balancing and battery settings: JK sends them on connect, JBD settings are read from the BMS memory on request; nothing is written
 - **Log in the browser** — records every battery at a chosen interval (5 s – 1 min) and keeps 7 days on the device; view it on the page as a chart and a table, download CSV (Excel) or JSON, open a saved file later; optional raw BLE frame capture for troubleshooting
 - **Works offline** (opt-in) — the app offers to save itself on the device, then opens without a network and can be installed to the home screen
 - **Reliable link** — automatic reconnection when the Bluetooth link drops; optional “keep screen on”
@@ -56,13 +57,19 @@
 
 ## Getting started
 
-1. Open **https://antondziuin.github.io/web-bms/** in **Chrome** or **Edge** (desktop or Android).
+1. Open **https://antondziuin.github.io/web-bms/** in **Chrome** or **Edge** (Windows, Mac or Android; for iPhone and iPad see [below](#iphone-ipad-and-mac)).
 2. Press **Connect** → **Choose device…** and pick your BMS in the system dialog. If a PIN is requested, it is usually `123456`.
 3. To watch several packs, press **Add** and pick the next BMS; the **All** chip shows them combined.
 4. To use the app without internet, accept the **Work offline** suggestion (or turn it on later in *Details → Settings*).
 5. **Log** tab: **Read from BMS** shows the log / counters stored in the BMS; below is the log this browser records while a BMS is connected.
 
-Firefox and Safari do not support Web Bluetooth; on iOS the [Bluefy](https://apps.apple.com/app/bluefy-web-ble-browser/id1492822055) browser can be used. Web Bluetooth needs HTTPS or `http://localhost`.
+Firefox does not support Web Bluetooth. Web Bluetooth needs HTTPS or `http://localhost`.
+
+### iPhone, iPad and Mac
+
+- **iPhone and iPad.** Apple does not support Web Bluetooth: Safari, and also Chrome, Edge and Firefox for iOS (they all run on the Safari engine), cannot connect to a BMS. Use the [Bluefy](https://apps.apple.com/app/bluefy-web-ble-browser/id1492822055) browser from the App Store: open **https://antondziuin.github.io/web-bms/** in it and press **Connect**. If the page is opened in Safari, the app shows this hint with a link to Bluefy.
+- **Limits on iPhone and iPad.** iOS pauses the page when the screen turns off or you switch to another app, so the link to the BMS drops: keep Bluefy open on the screen. Bluefy supports less than Chrome: if it cannot list recent devices, pick the BMS in the list each time.
+- **Mac.** Chrome and Edge on macOS support Web Bluetooth; Safari does not. On the first connection macOS asks to allow Bluetooth for the browser; if it was denied, turn it on in *System Settings → Privacy & Security → Bluetooth*.
 
 ## Development
 
@@ -98,6 +105,7 @@ npm run test:e2e   # the app in headless Chromium with a Bluetooth mock (Playwri
 | `js/model.js`, `js/session.js` | battery state, multi-battery aggregate, session counters |
 | `js/chart.js`, `js/i18n.js`, `js/offline.js` | chart, translations, offline mode |
 | `js/bmsmemory.js` | JK event log / JBD protection counters read from the BMS |
+| `js/bmssettings.js` | BMS parameters (protections, balancing), view only |
 | `js/log.js`, `js/logformat.js`, `js/logstore.js` | browser log: recording (IndexedDB), viewer, CSV / JSON |
 | `js/app.js` | battery manager and UI |
 | `sw.js` | service worker (registered only after the user opts in) |

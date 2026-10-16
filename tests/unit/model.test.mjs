@@ -79,3 +79,12 @@ test('aggregate ignores packs without data', () => {
   close(agg.totalV, 13.2); close(agg.current, 2); close(agg.soc, 50);
   assert.equal(aggregateStates([createState()]).lastSummaryTs, 0);
 });
+
+test('BMS settings from an update are kept with their time', () => {
+  const s = createState();
+  applyUpdate(s, { cfgUvpMv: 2800, bmsSettings: { cellUvp: 2800 } }, 1234);
+  assert.deepEqual(s.bmsSettings, { cellUvp: 2800 });
+  assert.equal(s.bmsSettingsAt, 1234);
+  applyUpdate(s, { totalV: 13.2 }, 2000);
+  assert.deepEqual(s.bmsSettings, { cellUvp: 2800 }, 'other updates do not clear it');
+});

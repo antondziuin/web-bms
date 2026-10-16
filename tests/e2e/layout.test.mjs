@@ -65,6 +65,10 @@ for (const locale of LOCALES){
             await page.click('#memRead');
             await page.waitForSelector('#memResult:not([hidden]), #memStatus:not([hidden])', { timeout: 8000 });
           }
+          if (tab === 'details' && chip > 0 && await page.isVisible('#bsetRead')){
+            await page.click('#bsetRead');
+            await page.waitForSelector('#bsetStatus:not([hidden])', { timeout: 15000 });
+          }
           await page.waitForTimeout(60);
           await auditPage(page, `${at} battery#${chip} ${tab}`, found);
         }
